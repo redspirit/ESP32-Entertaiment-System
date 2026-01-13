@@ -1,4 +1,5 @@
 #include "VGA.h"
+#include "tiles.h"
 #include <Arduino.h>
 
 extern "C" { 
@@ -84,6 +85,9 @@ void setup() {
 
     LOG.println("Started!!!");
 
+    printText("Hello World", 5, 5);
+    printText("Line 1\nLine 2\nLine 3", 5, 7);
+
     luaInit();
 }
 
@@ -112,6 +116,9 @@ void loop() {
         LOG.println(lua_tostring(L, -1));
         lua_pop(L, 1);
     }
+
+    renderTilemap(vga, vga.rgb(0,255,0), vga.rgb(0,0,0));
+
     vga.show();
 
 	fps_frames++;
