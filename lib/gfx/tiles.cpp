@@ -1,6 +1,7 @@
 #include "tiles.h"
 // #include "font8x8.h"
 #include "font8x8cyr.h"
+// #include "font8x8cp866.h"
 #include "VGA.h"
 
 static constexpr int TILE_W = 8;
@@ -67,64 +68,35 @@ void drawTileFast(
     }
 }
 
-static bool isGlyphEmpty(char c) {
-    const uint8_t* g = font8x8cyr::get(c);
-    for (int i = 0; i < 8; i++)
-        if (g[i] != 0) return false;
-    return true;
-}
 
 static char hexDigit(uint8_t v) {
     return (v < 10) ? ('0' + v) : ('A' + (v - 10));
 }
 
 void initTilemapFontTable() {
-    // очистка карты
-    for (int y = 0; y < GRID_H; y++)
-        for (int x = 0; x < GRID_W; x++)
-            tilemap[y][x] = 0;
+    int row = 1;
 
-    const int CELL_W = 5;   // "8A-А"
-    const int COLS   = GRID_W / CELL_W;
+    for (int base = 0; base < 256 && row < GRID_H; base += 16, row++) {
+        int x = 1;
 
-    int col = 0;
-    int row = 0;
+        // 0xNN
+        tilemap[row][x++] = '0';
+        tilemap[row][x++] = 'x';
+        tilemap[row][x++] = hexDigit((base >> 4) & 0xF);
+        tilemap[row][x++] = hexDigit(base & 0xF);
 
-    for (int c = 0; c < 256; c++) {
+        // пробел
+        tilemap[row][x++] = ' ';
 
-        if (isGlyphEmpty((char)c))
-            continue;
-
-        if (row >= GRID_H) {
-            row = 0;
-            col++;
-        }
-
-        int x = col * CELL_W;
-        int y = row;
-
-        if (col >= COLS)
-            break;
-
-        tilemap[y][x + 0] = hexDigit((c >> 4) & 0xF);
-        tilemap[y][x + 1] = hexDigit(c & 0xF);
-        tilemap[y][x + 2] = '-';
-        tilemap[y][x + 3] = (char)c;
-
-        row++;
-    }
-}
-
-void initTilemapTest() {
-    char c = 0;
-    for (int y = 0; y < GRID_H; y++) {
-        for (int x = 0; x < GRID_W; x++) {
-            tilemap[y][x] = c;
-            c++;
-            if (c >= font8x8cyr::COUNT) c = 0;
+        // 16 символов строки
+        for (int i = 0; i < 16 && x < GRID_W; i++) {
+            uint8_t c = base + i;
+            tilemap[row][x] = (char)c;
+            x++;
         }
     }
 }
+
 
 void printText(const char* text, int x, int y) {
     int cx = x;

@@ -61,12 +61,12 @@ void luaInit() {
         end
 
         function show()
-            clear(0)
-            fillRect(
-                math.floor(x),
-                math.floor(y),
-                w, h, 255
-            )
+            //clear(0)
+            //fillRect(
+            //    math.floor(x),
+            //    math.floor(y),
+            //    w, h, 255
+            //)
         end
     )lua";
 
@@ -85,8 +85,8 @@ void setup() {
 
     LOG.println("Started!!!");
 
-    printText("Hello World", 3, 5);
-    printText("Экостаровец Вайб!", 3, 7);
+    // printText("Hello World", 3, 5);
+    printText("хи", 2, 20);
 
     // initTilemapTest();
     initTilemapFontTable();
