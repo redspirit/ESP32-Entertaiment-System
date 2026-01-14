@@ -50,7 +50,7 @@ void luaInit() {
     const char game_lua[] PROGMEM = R"lua(
         local x, y = 50, 50
         local w, h = 30, 30
-        local vx, vy = 3, 2
+        local vx, vy = 2, 2
 
         function update(dt)
             x = x + vx * dt * 60
@@ -85,8 +85,11 @@ void setup() {
 
     LOG.println("Started!!!");
 
-    printText("Hello World", 5, 5);
-    printText("Line 1\nLine 2\nLine 3", 5, 7);
+    printText("Hello World", 3, 5);
+    printText("Экостаровец Вайб!", 3, 7);
+
+    // initTilemapTest();
+    initTilemapFontTable();
 
     luaInit();
 }
