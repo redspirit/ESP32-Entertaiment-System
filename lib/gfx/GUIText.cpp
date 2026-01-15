@@ -1,5 +1,6 @@
 #include "GUIText.h"
 #include "GUILayer.h"
+#include "palette.h"
 
 namespace GUIText {
 
@@ -38,6 +39,35 @@ namespace GUIText {
         }
     }
 
+    void printPaletteTable() {
+        GUI::Tile* map = GUI::getTilemap();
+        int row = 1;
+
+        for (int base = 0; base < 256 && row < GUI::GRID_H; base += 16, row++) {
+            int x = 1;
+
+            auto put = [&](char c, uint8_t color) {
+                if (x < GUI::GRID_W) {
+                    TILE(map, x, row).ch    = c;
+                    TILE(map, x, row).color = color;
+                    x++;
+                }
+            };
+
+            // 0xNN — заголовок строки (системным цветом)
+            put('0', COLOR_WHITE);
+            put('x', COLOR_WHITE);
+            put(hexDigit((base >> 4) & 0xF), COLOR_WHITE);
+            put(hexDigit(base & 0xF), COLOR_WHITE);
+            put(' ', COLOR_WHITE);
+
+            // 16 цветов строки
+            for (int i = 0; i < 16 && x < GUI::GRID_W; i++) {
+                uint8_t color = base + i;
+                put((char)219, color); // █
+            }
+        }
+    }    
 
     uint8_t utf8ToCp866(const char*& p) {
         uint8_t c = (uint8_t)*p++;

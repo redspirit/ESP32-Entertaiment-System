@@ -2,6 +2,7 @@
 #include "GUILayer.h"
 #include "GUIText.h"
 #include "palette.h"
+#include "console.h"
 #include <Arduino.h>
 
 extern "C" { 
@@ -88,13 +89,23 @@ void setup() {
     LOG.println("Started!!!");
 
     // printText("Hello World", 3, 5);
-    GUIText::printUTF8("ПРИВЕТ МИР и так далее", 1, 10, COLOR_BLUE);
-    GUIText::print("This is my PC", 1, 12, COLOR_RED);
+    //GUIText::printUTF8("ПРИВЕТ МИР и так далее", 1, 10, COLOR_BLUE);
+    //GUIText::print("This is my PC", 1, 12, COLOR_RED);
+
+    paletteInit();
+
+    // console::print("Loading");
+    // console::print("...");
+    // console::printLn(" OK");
+    // console::printLn();
+    // console::printLn();
+    // console::printLn("Welcome");
+    // console::print("> ");
 
     // initTilemapTest();
     //initTilemapFontTable();
+    GUIText::printPaletteTable();
 
-    paletteInit();
     luaInit();
 }
 
