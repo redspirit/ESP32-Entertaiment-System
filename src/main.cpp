@@ -1,5 +1,6 @@
 #include "VGA.h"
-#include "tiles.h"
+#include "GUILayer.h"
+#include "GUIText.h"
 #include <Arduino.h>
 
 extern "C" { 
@@ -86,10 +87,10 @@ void setup() {
     LOG.println("Started!!!");
 
     // printText("Hello World", 3, 5);
-    printText("хи", 2, 20);
+    GUIText::printUTF8("ПРИВЕТ МИР и так далее", 1, 10, vga.rgb(224,100,0));
 
     // initTilemapTest();
-    initTilemapFontTable();
+    //initTilemapFontTable();
 
     luaInit();
 }
@@ -120,7 +121,7 @@ void loop() {
         lua_pop(L, 1);
     }
 
-    renderTilemap(vga, vga.rgb(0,255,0), vga.rgb(0,0,0));
+    GUI::render(vga);
 
     vga.show();
 
