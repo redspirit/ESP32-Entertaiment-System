@@ -9,7 +9,7 @@ namespace GUIText {
         return (v < 10) ? ('0' + v) : ('A' + (v - 10));
     }
 
-    void printFontTable(uint8_t color) {
+    void printFontTable(uint8_t color_index) {
         int row = 1;
 
         for (int base = 0; base < 256 && row < GUI::GRID_H; base += 16, row++) {
@@ -18,9 +18,7 @@ namespace GUIText {
             auto put = [&](char c) {
                 if (x < GUI::GRID_W) {
                     TILE(map, x, row).ch = c;
-                    TILE(map, x, row).color = color;
-                    // map[row][x].ch    = c;
-                    // map[row][x].color = color;
+                    TILE(map, x, row).color = color_index;
                     x++;
                 }
             };
@@ -74,7 +72,7 @@ namespace GUIText {
         return '?';
     }
 
-    void print(const char* text, int x, int y, uint8_t color) {
+    void print(const char* text, int x, int y, uint8_t color_index) {
         int cx = x;
         int cy = y;
 
@@ -92,12 +90,12 @@ namespace GUIText {
                 continue;
 
             TILE(map, cx, cy).ch = c;
-            TILE(map, cx, cy).color = color;
+            TILE(map, cx, cy).color = color_index;
             cx++;
         }
     }
 
-    void printUTF8(const char* text, int x, int y, uint8_t color) {
+    void printUTF8(const char* text, int x, int y, uint8_t color_index) {
         int cx = x;
         int cy = y;
 
@@ -114,9 +112,7 @@ namespace GUIText {
 
             if (cx >= 0 && cx < GUI::GRID_W && cy >= 0 && cy < GUI::GRID_H) {
                 TILE(map, cx, cy).ch = ch;
-                TILE(map, cx, cy).color = color;
-                // map[cy][cx].ch    = ch;
-                // map[cy][cx].color = color;
+                TILE(map, cx, cy).color = color_index;
             }
 
             cx++;

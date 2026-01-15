@@ -9,8 +9,8 @@ namespace GUI {
     constexpr int GRID_H = 30;
 
     struct Tile {
-        uint8_t ch;
-        uint8_t color;
+        uint8_t ch;    // символ из шрифта CP866
+        uint8_t color; // индекс цвета из палитры (не сам цвет)
     };
 
     Tile* getTilemap();

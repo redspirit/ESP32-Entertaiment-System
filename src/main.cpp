@@ -1,6 +1,7 @@
 #include "VGA.h"
 #include "GUILayer.h"
 #include "GUIText.h"
+#include "palette.h"
 #include <Arduino.h>
 
 extern "C" { 
@@ -62,12 +63,12 @@ void luaInit() {
         end
 
         function show()
-            //clear(0)
-            //fillRect(
-            //    math.floor(x),
-            //    math.floor(y),
-            //    w, h, 255
-            //)
+            --clear(0)
+            --fillRect(
+            --    math.floor(x),
+            --    math.floor(y),
+            --    w, h, 255
+            --)
         end
     )lua";
 
@@ -87,11 +88,13 @@ void setup() {
     LOG.println("Started!!!");
 
     // printText("Hello World", 3, 5);
-    GUIText::printUTF8("ПРИВЕТ МИР и так далее", 1, 10, vga.rgb(224,100,0));
+    GUIText::printUTF8("ПРИВЕТ МИР и так далее", 1, 10, COLOR_BLUE);
+    GUIText::print("This is my PC", 1, 12, COLOR_RED);
 
     // initTilemapTest();
     //initTilemapFontTable();
 
+    paletteInit();
     luaInit();
 }
 
