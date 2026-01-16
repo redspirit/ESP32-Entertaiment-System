@@ -3,15 +3,8 @@
 #include "GUIText.h"
 #include "palette.h"
 #include "console.h"
+#include "luaManager.h"
 #include <Arduino.h>
-
-extern "C" { 
-    #include "lua.h" 
-    #include "lauxlib.h" 
-    #include "lualib.h" 
-}
-
-#include "esp_heap_caps.h"
 
 #define LOG Serial0
 
@@ -24,60 +17,6 @@ const PinConfig pins(
 
 VGA vga;
 Mode mode = Mode::MODE_320x240x60;
-
-lua_State* L;
-
-int l_clearFast(lua_State* Ls) {
-    int c = luaL_checkinteger(Ls, 1);
-    vga.clearFast(c);
-    return 0;
-}
-
-int l_fillRect(lua_State* Ls) {
-    int x = luaL_checkinteger(Ls, 1);
-    int y = luaL_checkinteger(Ls, 2);
-    int w = luaL_checkinteger(Ls, 3);
-    int h = luaL_checkinteger(Ls, 4);
-    int c = luaL_checkinteger(Ls, 5);
-    vga.fillRect(x, y, w, h, c);
-    return 0;
-}
-
-void luaInit() {
-    L = luaL_newstate();
-    luaL_openlibs(L);
-
-    lua_register(L, "clear", l_clearFast);
-    lua_register(L, "fillRect",  l_fillRect);
-
-    const char game_lua[] PROGMEM = R"lua(
-        local x, y = 50, 50
-        local w, h = 30, 30
-        local vx, vy = 2, 2
-
-        function update(dt)
-            x = x + vx * dt * 60
-            y = y + vy * dt * 60
-
-            if x <= 0 or x + w >= 320 then vx = -vx end
-            if y <= 0 or y + h >= 240 then vy = -vy end
-        end
-
-        function show()
-            --clear(0)
-            --fillRect(
-            --    math.floor(x),
-            --    math.floor(y),
-            --    w, h, 255
-            --)
-        end
-    )lua";
-
-    if (luaL_dostring(L, game_lua) != LUA_OK) {
-        LOG.println(lua_tostring(L, -1));
-        lua_pop(L, 1);
-    }
-}
 
 
 void setup() {
@@ -102,11 +41,11 @@ void setup() {
     // console::printLn("Welcome");
     // console::print("> ");
 
-    // initTilemapTest();
+    //initTilemapTest();
     //initTilemapFontTable();
     GUIText::printPaletteTable();
 
-    luaInit();
+    luaManager::luaInit(vga);
 }
 
 unsigned long fps_last_time = 0;
@@ -122,18 +61,8 @@ void loop() {
 
     if (dt > 0.05f) dt = 0.05f; // clamp
 
-    lua_getglobal(L, "update");
-    lua_pushnumber(L, dt);
-    if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
-        LOG.println(lua_tostring(L, -1));
-        lua_pop(L, 1);
-    }
-
-    lua_getglobal(L, "show");
-    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
-        LOG.println(lua_tostring(L, -1));
-        lua_pop(L, 1);
-    }
+    // luaManager::callUpdate(dt);
+    // luaManager::callShow();
 
     GUI::render(vga);
 
