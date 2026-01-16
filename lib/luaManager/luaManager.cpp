@@ -1,5 +1,6 @@
 #include "luaManager.h" 
 #include "VGA.h"
+#include "SDCard.h"
 
 extern "C" { 
     #include "lua.h" 
@@ -7,10 +8,25 @@ extern "C" {
     #include "lualib.h" 
 }
 
+static const char* sdLuaReader(lua_State*, void*, size_t* size) {
+    alignas(4) static char buf[512];
+
+    if (!SDCard::available()) {
+        *size = 0;
+        return nullptr;
+    }
+
+    *size = SDCard::read(buf, sizeof(buf));
+    return buf;
+}
+
 namespace luaManager {
 
     static lua_State* L = nullptr;
     static VGA* g_vga = nullptr;   // доступ из Lua-C API
+
+    static int refUpdate = LUA_NOREF;
+    static int refShow   = LUA_NOREF;
 
     // ===== Lua C API =====
 
@@ -37,55 +53,90 @@ namespace luaManager {
 
         lua_register(L, "clear",     l_clearFast);
         lua_register(L, "fillRect",  l_fillRect);
+    }
 
-        static const char game_lua[] = R"lua(
-            local x, y = 50, 50
-            local w, h = 30, 30
-            local vx, vy = 2, 2
-
-            function update(dt)
-                x = x + vx * dt * 60
-                y = y + vy * dt * 60
-
-                if x <= 0 or x + w >= 320 then vx = -vx end
-                if y <= 0 or y + h >= 240 then vy = -vy end
-            end
-
-            function show()
-                clear(0)
-                fillRect(
-                    math.floor(x),
-                    math.floor(y),
-                    w, h, 255
-                )
-            end
-        )lua";
-
-        if (luaL_dostring(L, game_lua) != LUA_OK) {
-            //LOG.println(lua_tostring(L, -1));
+    static void cacheCallbacks() {
+        // update
+        lua_getglobal(L, "update");
+        if (lua_isfunction(L, -1))
+            refUpdate = luaL_ref(L, LUA_REGISTRYINDEX);
+        else {
             lua_pop(L, 1);
+            refUpdate = LUA_NOREF;
+        }
+
+        // show
+        lua_getglobal(L, "show");
+        if (lua_isfunction(L, -1))
+            refShow = luaL_ref(L, LUA_REGISTRYINDEX);
+        else {
+            lua_pop(L, 1);
+            refShow = LUA_NOREF;
         }
     }
 
     void callUpdate(float dt) {
-        lua_getglobal(L, "update");
+        if (!L || refUpdate == LUA_NOREF) return;
+
+        lua_rawgeti(L, LUA_REGISTRYINDEX, refUpdate);
         lua_pushnumber(L, dt);
+
         if (lua_pcall(L, 1, 0, 0) != LUA_OK) {
-            //LOG.println(lua_tostring(L, -1));
             lua_pop(L, 1);
         }
     }
 
     void callShow() {
-        lua_getglobal(L, "show");
+        if (!L || refShow == LUA_NOREF) return;
+
+        lua_rawgeti(L, LUA_REGISTRYINDEX, refShow);
+
         if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
-            // LOG.println(lua_tostring(L, -1));
             lua_pop(L, 1);
         }
     }
 
+    bool loadFromSD(lua_State* L, const char* path) {
+        if (!SDCard::open(path))
+            return false;
+
+        lua_settop(L, 0); // очистить стек
+        int r = lua_load(L, sdLuaReader, nullptr, path, nullptr);
+        SDCard::close();
+
+        return r == LUA_OK;
+    }
+
+    bool loadAndRunFromSD(const char* path) {
+        if (!L) return false;
+
+        if (!loadFromSD(L, path))
+            return false;
+
+        // выполнить chunk
+        if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+            // LOG.println(lua_tostring(L, -1));
+            lua_pop(L, 1);
+            return false;
+        }
+
+        cacheCallbacks();
+        return true;
+    }
+
+    bool loadAndRunFromString(const char* code) {
+        if (!L || !code) return false;
+
+        lua_settop(L, 0); // очистить стек
+
+        if (luaL_dostring(L, code) != LUA_OK) {
+            // LOG.println(lua_tostring(L, -1));
+            lua_pop(L, 1);
+            return false;
+        }
+
+        cacheCallbacks();
+        return true;
+    }    
+
 }
-
-
-
-

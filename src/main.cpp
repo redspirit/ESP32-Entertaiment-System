@@ -4,6 +4,7 @@
 #include "palette.h"
 #include "console.h"
 #include "luaManager.h"
+#include "SDCard.h"
 #include <Arduino.h>
 
 #define LOG Serial0
@@ -46,6 +47,8 @@ void setup() {
     GUIText::printPaletteTable();
 
     luaManager::luaInit(vga);
+
+    //luaManager::loadAndRunFromString(game_lua);
 }
 
 unsigned long fps_last_time = 0;
@@ -61,8 +64,8 @@ void loop() {
 
     if (dt > 0.05f) dt = 0.05f; // clamp
 
-    // luaManager::callUpdate(dt);
-    // luaManager::callShow();
+    luaManager::callUpdate(dt);
+    luaManager::callShow();
 
     GUI::render(vga);
 
