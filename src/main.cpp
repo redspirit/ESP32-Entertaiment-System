@@ -5,6 +5,7 @@
 #include "console.h"
 #include "luaManager.h"
 #include "SDCard.h"
+#include "keyboard.h"
 #include <Arduino.h>
 
 #define LOG Serial0
@@ -32,7 +33,13 @@ void setup() {
     //GUIText::printUTF8("ПРИВЕТ МИР и так далее", 1, 10, COLOR_BLUE);
     //GUIText::print("This is my PC", 1, 12, COLOR_RED);
 
+    SDCard::init();
+    // SDCard::listDir("/", [](const char* name, bool isDir) {
+    //     LOG.println(name);
+    // });
+
     paletteInit();
+    keyboard::init();
 
     // console::print("Loading");
     // console::print("...");
@@ -47,8 +54,7 @@ void setup() {
     GUIText::printPaletteTable();
 
     luaManager::luaInit(vga);
-
-    //luaManager::loadAndRunFromString(game_lua);
+    // luaManager::loadAndRunFromSD("/demo.lua");
 }
 
 unsigned long fps_last_time = 0;
@@ -64,6 +70,18 @@ void loop() {
 
     if (dt > 0.05f) dt = 0.05f; // clamp
 
+
+    keyboard::KeyEvent ev;
+    while (keyboard::readKey(ev)) {
+        if (ev.pressed) {
+            LOG.print("DOWN ");
+        } else {
+            LOG.print("UP   ");
+        }
+        LOG.print("KEY: 0x");
+        LOG.println(ev.key, HEX);
+    }
+
     luaManager::callUpdate(dt);
     luaManager::callShow();
 
@@ -73,7 +91,7 @@ void loop() {
 
 	fps_frames++;
 	if (millis() - fps_last_time >= 1000) {
-		LOG.print("FPS: "); LOG.println(fps_frames);
+		// LOG.print("FPS: "); LOG.println(fps_frames);
 
         // LOG.print("Free heap: ");
         // LOG.println(heap_caps_get_free_size(MALLOC_CAP_8BIT));

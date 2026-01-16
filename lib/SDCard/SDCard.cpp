@@ -7,10 +7,10 @@ extern "C" {
 }
 
 // ===== SD SPI pins =====
-#define SD_CS    13
-#define SD_SCK   14
-#define SD_MOSI  27
-#define SD_MISO  32
+#define SD_CS    21
+#define SD_SCK   18
+#define SD_MOSI  17
+#define SD_MISO  16
 
 static File currentFile;
 
@@ -59,8 +59,7 @@ namespace SDCard {
         return true;
     }
 
-    void listDir(const char* path,
-                 void (*callback)(const char* name, bool isDir)) {
+    void listDir(const char* path, void (*callback)(const char* name, bool isDir)) {
 
         File dir = SD.open(path);
         if (!dir || !dir.isDirectory()) return;
