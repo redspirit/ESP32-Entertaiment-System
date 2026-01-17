@@ -13,5 +13,6 @@ namespace keyboard {
     bool available();
     uint8_t read();
     bool readKey(KeyEvent& ev);
+    bool isPressed(uint16_t key);
 }
 

@@ -6,6 +6,7 @@
 #include "luaManager.h"
 #include "SDCard.h"
 #include "keyboard.h"
+#include "scancodes.h"
 #include <Arduino.h>
 
 #define LOG Serial0
@@ -55,31 +56,17 @@ void setup() {
 
     luaManager::luaInit(vga);
     // luaManager::loadAndRunFromSD("/demo.lua");
+
 }
 
 unsigned long fps_last_time = 0;
 unsigned long fps_frames = 0;
 unsigned long fps_frames_final = 0;
 
-void loop() {
-    static unsigned long last = 0;
-    unsigned long now = millis();
-    if (now - last < 16) return; // ~60 FPS
-    float dt = (now - last) * 1e-3f;
-    last = now;
+void update60fps(float dt) {
 
-    if (dt > 0.05f) dt = 0.05f; // clamp
-
-
-    keyboard::KeyEvent ev;
-    while (keyboard::readKey(ev)) {
-        if (ev.pressed) {
-            LOG.print("DOWN ");
-        } else {
-            LOG.print("UP   ");
-        }
-        LOG.print("KEY: 0x");
-        LOG.println(ev.key, HEX);
+    if(keyboard::isPressed(Key::ENTER)) {
+        LOG.print('*');
     }
 
     luaManager::callUpdate(dt);
@@ -88,6 +75,30 @@ void loop() {
     GUI::render(vga);
 
     vga.show();
+
+}
+
+void loop() {
+    static unsigned long last = 0;
+    unsigned long now = millis();
+
+    keyboard::KeyEvent ev;
+    while (keyboard::readKey(ev)) {
+        if (ev.pressed) {
+            KeyChar kc = KeyMap[ev.key];
+            if (kc.normal) {
+                LOG.print(kc.normal);
+            }
+        }
+    }
+
+    if (now - last < 16) return; // ~60 FPS
+    float dt = (now - last) * 1e-3f;
+    last = now;
+
+    if (dt > 0.05f) dt = 0.05f; // clamp
+
+    update60fps(dt);
 
 	fps_frames++;
 	if (millis() - fps_last_time >= 1000) {

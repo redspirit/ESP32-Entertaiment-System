@@ -1,4 +1,5 @@
 #include "keyboard.h"
+#include "scancodes.h"
 #include <Arduino.h>
 
 #define PS2_CLK   38
@@ -7,8 +8,12 @@
 #define BUF_SIZE  32
 #define BUF_MASK  (BUF_SIZE - 1)
 
-#define EVENT_BUF_SIZE 16
+#define EVENT_BUF_SIZE 32
 #define EVENT_BUF_MASK (EVENT_BUF_SIZE - 1)
+
+#define KEY_BIT(k)   ((k) & 0x1FF)
+#define KEY_BYTE(k)  (KEY_BIT(k) >> 3)
+#define KEY_MASK(k)  (1 << (KEY_BIT(k) & 7))
 
 namespace keyboard {
 
@@ -26,11 +31,13 @@ namespace keyboard {
     static volatile uint8_t incoming = 0;
     static volatile uint32_t lastTickUs = 0;
 
+    static uint8_t keyBits[64]; // 512 keys
+
     // ===== Fast GPIO read =====
     static inline bool readData() {
-        if (PS2_DATA < 32)
-            return GPIO.in & (1UL << PS2_DATA);
-        else
+        // if (PS2_DATA < 32)
+        //     return GPIO.in & (1UL << PS2_DATA);
+        // else
             return GPIO.in1.val & (1UL << (PS2_DATA - 32));
     }
 
@@ -110,6 +117,7 @@ namespace keyboard {
 
     // ===== Public API =====
     void init() {
+        initKeyMap();
         pinMode(PS2_CLK, INPUT_PULLUP);
         pinMode(PS2_DATA, INPUT_PULLUP);
 
@@ -163,7 +171,11 @@ namespace keyboard {
 
         uint8_t next = (eventHead + 1) & EVENT_BUF_MASK;
         if (next == eventTail) {
-            // очередь переполнена — событие теряем
+            // очередь переполнена
+            // НО состояние клавиши всё равно надо обновить
+            uint16_t key = sc | (extended ? 0x100 : 0);
+            if (release)
+                keyBits[KEY_BYTE(key)] &= ~KEY_MASK(key);
             release = false;
             extended = false;
             return;
@@ -194,6 +206,11 @@ namespace keyboard {
         eventTail = (eventTail + 1) & EVENT_BUF_MASK;
         interrupts();
 
+        if (ev.pressed)
+            keyBits[KEY_BYTE(ev.key)] |=  KEY_MASK(ev.key);
+        else
+            keyBits[KEY_BYTE(ev.key)] &= ~KEY_MASK(ev.key);
+
         return true;
     }
 
@@ -204,4 +221,9 @@ namespace keyboard {
         interrupts();
         return v;
     }
+
+    bool isPressed(uint16_t key) {
+        return keyBits[KEY_BYTE(key)] & KEY_MASK(key);
+    }
+
 }
