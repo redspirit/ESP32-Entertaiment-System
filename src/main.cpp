@@ -7,9 +7,10 @@
 #include "SDCard.h"
 #include "keyboard.h"
 #include "scancodes.h"
+#include "LOG.h"
 #include <Arduino.h>
 
-#define LOG Serial0
+
 
 const PinConfig pins(
     -1, -1, 4, 5, 6,
@@ -52,7 +53,7 @@ void setup() {
 
     //initTilemapTest();
     //initTilemapFontTable();
-    GUIText::printPaletteTable();
+    //GUIText::printPaletteTable();
 
     luaManager::luaInit(vga);
     // luaManager::loadAndRunFromSD("/demo.lua");
@@ -64,10 +65,34 @@ unsigned long fps_frames = 0;
 unsigned long fps_frames_final = 0;
 
 void update60fps(float dt) {
+    // keyboard::KeyEvent ev;
+    // while (keyboard::readKey(ev)) {
+    //     if (ev.pressed) {
+    //         KeyChar kc = KeyMap[ev.key];
+    //         if (kc.normal) {
+    //             //LOG.print(kc.normal);
+    //             console::print(kc.normal);
+    //         }
+    //         if (ev.key == Key::ENTER) {
+    //             console::printLn();
+    //         }
+    //     }
+    // }
 
-    if(keyboard::isPressed(Key::ENTER)) {
-        LOG.print('*');
+    char c;
+    while (keyboard::getChar(c)) {
+        console::print(c);
     }
+
+    // if(keyboard::isPressed(Key::ENTER)) {
+    //     console::print('.');
+    // }    
+    // if(keyboard::isJustPressed(Key::ENTER)) {
+    //     console::print('P');
+    // }    
+    // if(keyboard::isJustReleased(Key::ENTER)) {
+    //     console::print('R');
+    // }
 
     luaManager::callUpdate(dt);
     luaManager::callShow();
@@ -79,19 +104,10 @@ void update60fps(float dt) {
 }
 
 void loop() {
+    keyboard::poll();
+
     static unsigned long last = 0;
     unsigned long now = millis();
-
-    keyboard::KeyEvent ev;
-    while (keyboard::readKey(ev)) {
-        if (ev.pressed) {
-            KeyChar kc = KeyMap[ev.key];
-            if (kc.normal) {
-                LOG.print(kc.normal);
-            }
-        }
-    }
-
     if (now - last < 16) return; // ~60 FPS
     float dt = (now - last) * 1e-3f;
     last = now;
@@ -99,10 +115,13 @@ void loop() {
     if (dt > 0.05f) dt = 0.05f; // clamp
 
     update60fps(dt);
+    keyboard::beginFrame();
 
 	fps_frames++;
 	if (millis() - fps_last_time >= 1000) {
 		// LOG.print("FPS: "); LOG.println(fps_frames);
+		LOG.print("ACK="); LOG.print(keyboard::getPs2AckCount());
+		LOG.print(" ERR="); LOG.println(keyboard::getPs2WriteErrors());
 
         // LOG.print("Free heap: ");
         // LOG.println(heap_caps_get_free_size(MALLOC_CAP_8BIT));

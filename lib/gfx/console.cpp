@@ -90,6 +90,11 @@ static uint8_t text_color = 28;
         flush();
     }
 
+    void print(char c) {
+        char buf[2] = { c, 0 };
+        print(buf);
+    }
+
     void printLn(const char* text) {
         if (text)
             print(text);

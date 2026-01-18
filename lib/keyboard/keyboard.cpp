@@ -1,5 +1,6 @@
 #include "keyboard.h"
 #include "scancodes.h"
+#include "LOG.h"
 #include <Arduino.h>
 
 #define PS2_CLK   38
@@ -32,6 +33,13 @@ namespace keyboard {
     static volatile uint32_t lastTickUs = 0;
 
     static uint8_t keyBits[64]; // 512 keys
+    static uint8_t prevKeyBits[64]; // предыдущее состояние
+
+    static bool capsLock = false;
+    static volatile bool ledsDirty = false;
+
+    static volatile uint32_t ps2WriteErrors = 0;
+    static volatile uint32_t ps2AckCount = 0;
 
     // ===== Fast GPIO read =====
     static inline bool readData() {
@@ -48,11 +56,13 @@ namespace keyboard {
         // ресинхронизация при паузе > 2 ms
         if (now - lastTickUs > 2000) {
             bitCount = 0;
+            incoming = 0;
         }
         lastTickUs = now;
 
         bool val = readData();
 
+        // ===== START BIT =====
         // ждём start bit (DATA = 0)
         if (bitCount == 0) {
             if (val) return;          // не start bit
@@ -61,58 +71,162 @@ namespace keyboard {
             return;
         }
 
-        // data bits 1..8 (LSB first)
+        // ===== DATA BITS 1..8 (LSB first) =====
         if (bitCount >= 1 && bitCount <= 8) {
             if (val)
                 incoming |= (1 << (bitCount - 1));
+            bitCount++;
+            return;
         }
 
-        // parity bit (9) — игнорируем, но учитываем
-        // stop bit (10) — должен быть 1
+        // ===== PARITY BIT (9) =====
+        if (bitCount == 9) {
+            // parity игнорируем, но шаг считаем
+            bitCount++;
+            return;
+        }
 
-        bitCount++;
+        // ===== STOP BIT (10) =====
+        if (bitCount == 10) {
+            // stop bit ОБЯЗАН быть 1
+            if (!val) {
+                // битый кадр — жёсткий сброс
+                bitCount = 0;
+                incoming = 0;
+                return;
+            }
 
-        if (bitCount == 11) {
+            // кадр корректен — сохраняем байт
             uint8_t next = (head + 1) & BUF_MASK;
             if (next != tail) {
                 buffer[head] = incoming;
                 head = next;
             }
+
             bitCount = 0;
+            return;
         }
     }
 
+    static bool waitPinState(uint8_t pin, uint8_t state) {
+        uint32_t start = micros();
+        while (digitalRead(pin) != state) {
+            if (micros() - start > 10000) { // PS2_TIMEOUT_US
+                return false; // Timeout
+            }
+        }
+        return true;
+    }
+
     // ===== Host → Keyboard write =====
-    static void ps2_write(uint8_t data) {
+    // Возвращает true, если отправка прошла успешно
+    static bool ps2_write(uint8_t data) {
+        // Отключаем ISR, чтобы прерывания не мешали отправке
         detachInterrupt(PS2_CLK);
 
+        // 1. Расчет Parity (Odd parity - нечетность)
+        // __builtin_parity возвращает 1, если число бит нечетное.
+        // Для Odd Parity сумма бит данных + бит четности должна быть нечетной.
+        // Если в данных четное кол-во бит (0), нам нужен 1.
+        // Если нечетное (1), нам нужен 0.
+        bool parity = !(__builtin_parity(data) & 1);
+
+        // 2. Инициализация (Host Request to Send)
         pinMode(PS2_CLK, OUTPUT);
-        pinMode(PS2_DATA, OUTPUT);
-
         digitalWrite(PS2_CLK, LOW);
-        delayMicroseconds(150);
+        delayMicroseconds(120); // Держим CLK > 100 мкс
+
+        pinMode(PS2_DATA, OUTPUT);
         digitalWrite(PS2_DATA, LOW);
-        delayMicroseconds(10);
+        delayMicroseconds(10); 
 
-        pinMode(PS2_CLK, INPUT_PULLUP); // keyboard clocks
+        // Отпускаем CLK, клавиатура должна начать генерировать такты
+        pinMode(PS2_CLK, INPUT_PULLUP);
 
-        // 8 data bits
+        // --- Отправка 8 бит данных ---
         for (uint8_t i = 0; i < 8; i++) {
-            while (digitalRead(PS2_CLK));
+            // Ждем, пока клавиатура опустит CLK (считывание хостом готовности)
+            if (!waitPinState(PS2_CLK, LOW)) goto error_exit;
+
+            // Выставляем бит данных
             digitalWrite(PS2_DATA, (data & 1) ? HIGH : LOW);
-            while (!digitalRead(PS2_CLK));
             data >>= 1;
+
+            // Ждем, пока клавиатура поднимет CLK (клавиатура прочитала бит)
+            if (!waitPinState(PS2_CLK, HIGH)) goto error_exit;
         }
 
-        // parity (odd)
-        while (digitalRead(PS2_CLK));
-        digitalWrite(PS2_DATA, HIGH);
-        while (!digitalRead(PS2_CLK));
+        // --- Отправка Parity бита ---
+        if (!waitPinState(PS2_CLK, LOW)) goto error_exit;
+        digitalWrite(PS2_DATA, parity ? HIGH : LOW);
+        if (!waitPinState(PS2_CLK, HIGH)) goto error_exit;
 
-        // stop bit
-        pinMode(PS2_DATA, INPUT_PULLUP);
+        // --- Отправка Stop бита (отпускаем DATA) ---
+        if (!waitPinState(PS2_CLK, LOW)) goto error_exit;
+        pinMode(PS2_DATA, INPUT_PULLUP); // Отпускаем линию (High)
+        if (!waitPinState(PS2_CLK, HIGH)) goto error_exit;
 
+        // Успех: восстанавливаем прерывание
         attachInterrupt(PS2_CLK, ps2_isr, FALLING);
+        return true;
+
+    error_exit:
+        // Ошибка: переводим пины в безопасное состояние и возвращаем прерывание
+        pinMode(PS2_CLK, INPUT_PULLUP);
+        pinMode(PS2_DATA, INPUT_PULLUP);
+        attachInterrupt(PS2_CLK, ps2_isr, FALLING);
+        
+        LOG.println("PS/2 Write Timeout Error!");
+        return false;
+    }
+
+    // Вспомогательная функция для ожидания конкретного байта прямо из буфера
+    static bool waitForByte(uint8_t target, uint32_t timeoutMs) {
+        uint32_t start = millis();
+        while (millis() - start < timeoutMs) {
+            // Проверяем, есть ли что-то в буфере ISR
+            if (available()) {
+                uint8_t b = read(); // Читаем байт, сдвигаем хвост буфера
+                if (b == target) {
+                    return true;
+                }
+                // Если пришло что-то другое (например, сканкод нажатой клавиши 
+                // прямо перед отправкой команды), мы его "проглотим".
+                // В простом варианте это допустимо, чтобы не усложнять логику.
+            }
+        }
+        return false;
+    }
+
+    static void setLeds() {
+        uint8_t leds = 0;
+        if (capsLock) leds |= (1 << 2);
+
+        // Попытка 1: Команда ED
+        if (!ps2_write(0xED)) {
+            ps2WriteErrors++;
+            return; // Аппаратная ошибка (обрыв/таймаут), выходим сразу
+        }
+
+        // Ждем ACK на команду
+        if (!waitForByte(0xFA, 200)) {
+            ps2WriteErrors++;
+            LOG.println("No ACK for 0xED");
+            // Важно: даже если нет ACK, можно попробовать послать данные, 
+            // чтобы сбросить стейт-машину клавиатуры, но часто это бесполезно.
+        }
+
+        // Попытка 2: Данные
+        if (!ps2_write(leds)) {
+            ps2WriteErrors++;
+            return;
+        }
+
+        // Ждем ACK на данные
+        if (!waitForByte(0xFA, 200)) {
+             ps2WriteErrors++;
+             LOG.println("No ACK for LED data");
+        }
     }
 
     // ===== Public API =====
@@ -155,9 +269,34 @@ namespace keyboard {
         return head != tail;
     }
 
+    static void pushEvent(uint16_t key, bool pressed, bool extended) {
+        // обновляем состояние ВСЕГДА
+        if (pressed)
+            keyBits[KEY_BYTE(key)] |=  KEY_MASK(key);
+        else
+            keyBits[KEY_BYTE(key)] &= ~KEY_MASK(key);
+
+        uint8_t next = (eventHead + 1) & EVENT_BUF_MASK;
+        if (next == eventTail) {
+            // очередь переполнена — событие не сохраняем
+            return;
+        }
+
+        eventBuf[eventHead] = { key, pressed, extended };
+        eventHead = next;
+    }
+
     static void processScanCode(uint8_t sc) {
+        // LOG.print("[RAW] ");
+        // LOG.println(sc, HEX);
         static bool release  = false;
         static bool extended = false;
+
+        // ACK от клавиатуры — НЕ scan-code
+        if (sc == 0xFA) {
+            ps2AckCount++;
+            return;
+        }
 
         if (sc == 0xE0) {
             extended = true;
@@ -169,35 +308,22 @@ namespace keyboard {
             return;
         }
 
-        uint8_t next = (eventHead + 1) & EVENT_BUF_MASK;
-        if (next == eventTail) {
-            // очередь переполнена
-            // НО состояние клавиши всё равно надо обновить
-            uint16_t key = sc | (extended ? 0x100 : 0);
-            if (release)
-                keyBits[KEY_BYTE(key)] &= ~KEY_MASK(key);
-            release = false;
-            extended = false;
-            return;
+        uint16_t key = sc | (extended ? 0x100 : 0);
+        bool pressed = !release;
+
+        pushEvent(key, pressed, extended);
+
+        // CapsLock — переключатель по НАЖАТИЮ
+        if (key == Key::CAPS && pressed) {
+            capsLock = !capsLock;
+            ledsDirty = true;   // только помечаем
         }
 
-        eventBuf[eventHead] = {
-            .key = uint16_t(sc | (extended ? 0x100 : 0)),
-            .pressed = !release,
-            .extended = extended
-        };
-        eventHead = next;
-
-        release = false;
+        release  = false;
         extended = false;
     }
 
     bool readKey(KeyEvent& ev) {
-        // сначала переработать все raw scan-codes
-        while (available()) {
-            processScanCode(read());
-        }
-
         if (eventHead == eventTail)
             return false;
 
@@ -205,11 +331,6 @@ namespace keyboard {
         ev = eventBuf[eventTail];
         eventTail = (eventTail + 1) & EVENT_BUF_MASK;
         interrupts();
-
-        if (ev.pressed)
-            keyBits[KEY_BYTE(ev.key)] |=  KEY_MASK(ev.key);
-        else
-            keyBits[KEY_BYTE(ev.key)] &= ~KEY_MASK(ev.key);
 
         return true;
     }
@@ -224,6 +345,75 @@ namespace keyboard {
 
     bool isPressed(uint16_t key) {
         return keyBits[KEY_BYTE(key)] & KEY_MASK(key);
+    }
+
+    void poll() {
+        // переработать ВСЕ raw scan-codes
+        while (available()) {
+            processScanCode(read());
+        }
+
+        if (ledsDirty) {
+            setLeds();
+            ledsDirty = false;
+        }        
+    }
+    
+    void beginFrame() {
+        // сохранить состояние клавиш в начале кадра
+        memcpy(prevKeyBits, keyBits, sizeof(keyBits));
+    }
+
+    bool isJustPressed(uint16_t key) {
+        uint8_t b = KEY_BYTE(key);
+        uint8_t m = KEY_MASK(key);
+
+        return (keyBits[b] & m) && !(prevKeyBits[b] & m);
+    }
+
+    bool isJustReleased(uint16_t key) {
+        uint8_t b = KEY_BYTE(key);
+        uint8_t m = KEY_MASK(key);
+
+        return !(keyBits[b] & m) && (prevKeyBits[b] & m);
+    }
+
+    bool getChar(char& out) {
+        KeyEvent ev;
+        if (!readKey(ev))
+            return false;
+
+        if (!ev.pressed)
+            return false;
+
+        // не печатаем модификаторы
+        if (ev.key == Key::SHIFT_LEFT  ||
+            ev.key == Key::SHIFT_RIGHT ||
+            ev.key == Key::CTRL_LEFT   ||
+            ev.key == Key::CTRL_RIGHT  ||
+            ev.key == Key::ALT_LEFT    ||
+            ev.key == Key::ALT_RIGHT)
+            return false;
+
+        KeyChar kc = KeyMap[ev.key];
+        if (!kc.normal)
+            return false;
+
+        bool shift =
+            isPressed(Key::SHIFT_LEFT) ||
+            isPressed(Key::SHIFT_RIGHT);
+
+        bool upper = capsLock ^ shift;
+        out = upper ? kc.shifted : kc.normal;
+        return true;
+    }
+
+    uint32_t getPs2AckCount() {
+        return ps2AckCount;
+    }
+
+    uint32_t getPs2WriteErrors() {
+        return ps2WriteErrors;
     }
 
 }
