@@ -120,9 +120,6 @@ void loop() {
 	fps_frames++;
 	if (millis() - fps_last_time >= 1000) {
 		// LOG.print("FPS: "); LOG.println(fps_frames);
-		LOG.print("ACK="); LOG.print(keyboard::getPs2AckCount());
-		LOG.print(" ERR="); LOG.println(keyboard::getPs2WriteErrors());
-
         // LOG.print("Free heap: ");
         // LOG.println(heap_caps_get_free_size(MALLOC_CAP_8BIT));
         // LOG.print("Stack high water: ");

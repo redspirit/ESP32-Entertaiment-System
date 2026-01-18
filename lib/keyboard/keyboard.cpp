@@ -121,112 +121,46 @@ namespace keyboard {
     // ===== Host → Keyboard write =====
     // Возвращает true, если отправка прошла успешно
     static bool ps2_write(uint8_t data) {
-        // Отключаем ISR, чтобы прерывания не мешали отправке
         detachInterrupt(PS2_CLK);
-
-        // 1. Расчет Parity (Odd parity - нечетность)
-        // __builtin_parity возвращает 1, если число бит нечетное.
-        // Для Odd Parity сумма бит данных + бит четности должна быть нечетной.
-        // Если в данных четное кол-во бит (0), нам нужен 1.
-        // Если нечетное (1), нам нужен 0.
         bool parity = !(__builtin_parity(data) & 1);
 
-        // 2. Инициализация (Host Request to Send)
         pinMode(PS2_CLK, OUTPUT);
         digitalWrite(PS2_CLK, LOW);
-        delayMicroseconds(120); // Держим CLK > 100 мкс
-
+        delayMicroseconds(120);
         pinMode(PS2_DATA, OUTPUT);
         digitalWrite(PS2_DATA, LOW);
-        delayMicroseconds(10); 
-
-        // Отпускаем CLK, клавиатура должна начать генерировать такты
+        delayMicroseconds(10);
         pinMode(PS2_CLK, INPUT_PULLUP);
 
-        // --- Отправка 8 бит данных ---
         for (uint8_t i = 0; i < 8; i++) {
-            // Ждем, пока клавиатура опустит CLK (считывание хостом готовности)
             if (!waitPinState(PS2_CLK, LOW)) goto error_exit;
-
-            // Выставляем бит данных
             digitalWrite(PS2_DATA, (data & 1) ? HIGH : LOW);
-            data >>= 1;
-
-            // Ждем, пока клавиатура поднимет CLK (клавиатура прочитала бит)
             if (!waitPinState(PS2_CLK, HIGH)) goto error_exit;
+            data >>= 1;
         }
 
-        // --- Отправка Parity бита ---
         if (!waitPinState(PS2_CLK, LOW)) goto error_exit;
         digitalWrite(PS2_DATA, parity ? HIGH : LOW);
         if (!waitPinState(PS2_CLK, HIGH)) goto error_exit;
 
-        // --- Отправка Stop бита (отпускаем DATA) ---
         if (!waitPinState(PS2_CLK, LOW)) goto error_exit;
-        pinMode(PS2_DATA, INPUT_PULLUP); // Отпускаем линию (High)
-        if (!waitPinState(PS2_CLK, HIGH)) goto error_exit;
-
-        // Успех: восстанавливаем прерывание
+        pinMode(PS2_DATA, INPUT_PULLUP);
+        
+        // --- ВАЖНО: Включаем прерывание ДО последнего подъема CLK ---
+        // Это позволит ISR поймать стоп-бит и следующий за ним ACK от клавиатуры
+        lastTickUs = micros(); // Обнуляем таймер паузы для ISR
+        bitCount = 0;          // Сбрасываем счетчик бит в ISR
         attachInterrupt(PS2_CLK, ps2_isr, FALLING);
+
+        if (!waitPinState(PS2_CLK, HIGH)) return true; // Все равно успех
+
         return true;
 
     error_exit:
-        // Ошибка: переводим пины в безопасное состояние и возвращаем прерывание
         pinMode(PS2_CLK, INPUT_PULLUP);
         pinMode(PS2_DATA, INPUT_PULLUP);
         attachInterrupt(PS2_CLK, ps2_isr, FALLING);
-        
-        LOG.println("PS/2 Write Timeout Error!");
         return false;
-    }
-
-    // Вспомогательная функция для ожидания конкретного байта прямо из буфера
-    static bool waitForByte(uint8_t target, uint32_t timeoutMs) {
-        uint32_t start = millis();
-        while (millis() - start < timeoutMs) {
-            // Проверяем, есть ли что-то в буфере ISR
-            if (available()) {
-                uint8_t b = read(); // Читаем байт, сдвигаем хвост буфера
-                if (b == target) {
-                    return true;
-                }
-                // Если пришло что-то другое (например, сканкод нажатой клавиши 
-                // прямо перед отправкой команды), мы его "проглотим".
-                // В простом варианте это допустимо, чтобы не усложнять логику.
-            }
-        }
-        return false;
-    }
-
-    static void setLeds() {
-        uint8_t leds = 0;
-        if (capsLock) leds |= (1 << 2);
-
-        // Попытка 1: Команда ED
-        if (!ps2_write(0xED)) {
-            ps2WriteErrors++;
-            return; // Аппаратная ошибка (обрыв/таймаут), выходим сразу
-        }
-
-        // Ждем ACK на команду
-        if (!waitForByte(0xFA, 200)) {
-            ps2WriteErrors++;
-            LOG.println("No ACK for 0xED");
-            // Важно: даже если нет ACK, можно попробовать послать данные, 
-            // чтобы сбросить стейт-машину клавиатуры, но часто это бесполезно.
-        }
-
-        // Попытка 2: Данные
-        if (!ps2_write(leds)) {
-            ps2WriteErrors++;
-            return;
-        }
-
-        // Ждем ACK на данные
-        if (!waitForByte(0xFA, 200)) {
-             ps2WriteErrors++;
-             LOG.println("No ACK for LED data");
-        }
     }
 
     // ===== Public API =====
@@ -321,6 +255,49 @@ namespace keyboard {
 
         release  = false;
         extended = false;
+    }
+
+    static bool waitForAck(uint32_t timeoutMs) {
+        uint32_t start = millis();
+        uint32_t initialAck = ps2AckCount; 
+        
+        while (millis() - start < timeoutMs) {
+            // Если в буфере что-то появилось - обрабатываем
+            while (available()) {
+                processScanCode(read());
+            }
+            // Если счетчик ACK увеличился - значит мы получили 0xFA
+            if (ps2AckCount > initialAck) return true;
+            
+            yield(); // Даем ESP32 заняться фоновыми задачами
+        }
+        return false;
+    }
+
+    static void setLeds() {
+        uint8_t leds = 0;
+        if (capsLock) leds |= (1 << 2);
+
+        // Шаг 1: Команда
+        if (ps2_write(0xED)) {
+            if (!waitForAck(200)) {
+                ps2WriteErrors++;
+                // LOG.println("Timeout ACK 0xED");
+            }
+        } else {
+            ps2WriteErrors++;
+            return;
+        }
+
+        // Шаг 2: Данные
+        if (ps2_write(leds)) {
+            if (!waitForAck(200)) {
+                ps2WriteErrors++;
+                // LOG.println("Timeout ACK LED Data");
+            }
+        } else {
+            ps2WriteErrors++;
+        }
     }
 
     bool readKey(KeyEvent& ev) {
