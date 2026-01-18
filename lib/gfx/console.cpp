@@ -18,6 +18,22 @@ static uint8_t text_color = 28;
     static int cx = 0;
     static int cy = 0;
 
+    void setCursor(int x, int y) {
+        if (x < 0) x = 0;
+        if (x >= GUI::GRID_W) x = GUI::GRID_W - 1;
+
+        if (y < 0) y = 0;
+        if (y >= GUI::GRID_H) y = GUI::GRID_H - 1;
+
+        cx = x;
+        cy = y;
+    }
+
+    void getCursor(int& x, int& y) {
+        x = cx;
+        y = cy;
+    }
+
     static void clearLine(int row) {
         memset(buffer[row], ' ', GUI::GRID_W);
     }
@@ -105,6 +121,15 @@ static uint8_t text_color = 28;
 
     void printLn() {
         newLine();
+        flush();
+    }
+
+    void clearCharAt(int x, int y) {
+        if (x < 0 || x >= GUI::GRID_W) return;
+        if (y < 0 || y >= GUI::GRID_H) return;
+
+        int row = (head + y) % GUI::GRID_H;
+        buffer[row][x] = ' ';
         flush();
     }
 

@@ -6,6 +6,18 @@ namespace GUIText {
 
     GUI::Tile* map = GUI::getTilemap();
 
+    static int cursorX = 0;
+    static int cursorY = 0;
+
+    static bool cursorEnabled = true;   // включён ли вообще
+    static bool cursorPhase   = true;   // текущая фаза мигания
+
+    static float blinkTimer   = 0.0f;
+    static constexpr float BLINK_PERIOD = 1.0f; // 1 Гц
+
+    static constexpr char CURSOR_CHAR = '_';
+    static constexpr uint8_t CURSOR_COLOR = COLOR_WHITE;
+
     static char hexDigit(uint8_t v) {
         return (v < 10) ? ('0' + v) : ('A' + (v - 10));
     }
@@ -152,5 +164,44 @@ namespace GUIText {
             }
         }
     }
+
+    void setCursor(bool isVisible) {
+        cursorEnabled = isVisible;
+    }
+
+    void moveCursor(int x, int y) {
+        if (cursorX < 0 || cursorX >= GUI::GRID_W ||
+            cursorY < 0 || cursorY >= GUI::GRID_H)
+            return;
+
+        cursorX = x;
+        cursorY = y;
+    }
+
+    void tick(float dt) {
+        if (!cursorEnabled) return;
+
+        blinkTimer += dt;
+        if (blinkTimer >= BLINK_PERIOD * 0.5f) {
+            blinkTimer = 0.0f;
+            cursorPhase = !cursorPhase;
+        }
+    }
+
+    void renderCursor(VGA& vga) {
+        if (!cursorEnabled) return;
+        if (!cursorPhase) return;
+
+        GUI::Tile t;
+        t.ch    = CURSOR_CHAR;
+        t.color = CURSOR_COLOR;
+
+        GUI::drawTile(
+            vga,
+            cursorX * 8,
+            cursorY * 8,
+            t
+        );
+    }    
 
 }

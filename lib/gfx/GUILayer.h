@@ -16,7 +16,7 @@ namespace GUI {
     Tile* getTilemap();
 
     void clear();
-    void drawTile(VGA& vga, int sx, int sy, Tile t, bool transparentBg);
+    void drawTile(VGA& vga, int sx, int sy, Tile t);
     void render(VGA& vga);
 }
 

@@ -6,11 +6,10 @@
 #include "luaManager.h"
 #include "SDCard.h"
 #include "keyboard.h"
+#include "shell.h"
 #include "scancodes.h"
 #include "LOG.h"
 #include <Arduino.h>
-
-
 
 const PinConfig pins(
     -1, -1, 4, 5, 6,
@@ -42,6 +41,7 @@ void setup() {
 
     paletteInit();
     keyboard::init();
+    shell::init();
 
     // console::print("Loading");
     // console::print("...");
@@ -79,28 +79,37 @@ void update60fps(float dt) {
     //     }
     // }
 
-    char c;
-    while (keyboard::getChar(c)) {
-        console::print(c);
-    }
+    // char c;
+    // while (keyboard::getChar(c)) {
+    //     console::print(c);
+    // }
 
-    // if(keyboard::isPressed(Key::ENTER)) {
+    // debugNum++;
+    // char buf[32];
+    // snprintf(buf, sizeof(buf), "LINE #%d", debugNum);
+    // console::printLn(buf);
+
+    // if(keyboard::isPressed(Key::RIGHT)) {
     //     console::print('.');
     // }    
-    // if(keyboard::isJustPressed(Key::ENTER)) {
-    //     console::print('P');
+    // if(keyboard::isJustPressed(Key::RIGHT)) {
+
     // }    
-    // if(keyboard::isJustReleased(Key::ENTER)) {
-    //     console::print('R');
+    // if(keyboard::isJustPressed(Key::LEFT)) {
+
     // }
+
+
+    shell::update(dt);
 
     luaManager::callUpdate(dt);
     luaManager::callShow();
+    vga.clearFast(0); // раньше это было в lua но пока тут оставим
 
     GUI::render(vga);
+    GUIText::renderCursor(vga);
 
     vga.show();
-
 }
 
 void loop() {
