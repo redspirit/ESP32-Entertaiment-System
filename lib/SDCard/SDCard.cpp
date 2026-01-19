@@ -1,3 +1,4 @@
+#include <SDCard.h>
 #include <SD.h>
 #include <SPI.h>
 
@@ -12,11 +13,19 @@ extern "C" {
 #define SD_MOSI  17
 #define SD_MISO  16
 
+#define MAX_DIR_ENTRIES 64
+#define MAX_NAME_LEN   32
+
 static File currentFile;
 
 namespace SDCard {
 
     static bool s_inited = false;
+
+    struct DirEntry {
+        char name[MAX_NAME_LEN];
+        bool isDir;
+    };
 
     bool init() {
         SPI.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
@@ -60,16 +69,74 @@ namespace SDCard {
     }
 
     void listDir(const char* path, void (*callback)(const char* name, bool isDir)) {
+        if (!s_inited)
+            return;
 
         File dir = SD.open(path);
-        if (!dir || !dir.isDirectory()) return;
+        if (!dir || !dir.isDirectory())
+            return;
+
+        DirEntry entries[MAX_DIR_ENTRIES];
+        int count = 0;
 
         File entry;
-        while ((entry = dir.openNextFile())) {
-            callback(entry.name(), entry.isDirectory());
+        while ((entry = dir.openNextFile()) && count < MAX_DIR_ENTRIES) {
+            strncpy(entries[count].name, entry.name(), MAX_NAME_LEN);
+            entries[count].name[MAX_NAME_LEN - 1] = 0;
+            entries[count].isDir = entry.isDirectory();
+            count++;
             entry.close();
         }
         dir.close();
+
+        // -------------------------------------------------
+        // Сортировка:
+        // 1) директории раньше файлов
+        // 2) по алфавиту
+        // -------------------------------------------------
+        for (int i = 0; i < count - 1; ++i) {
+            for (int j = i + 1; j < count; ++j) {
+
+                bool swap = false;
+
+                if (entries[i].isDir != entries[j].isDir) {
+                    // директории выше
+                    if (!entries[i].isDir)
+                        swap = true;
+                }
+                else {
+                    // одинаковый тип — сортировка по имени
+                    if (strcasecmp(entries[i].name, entries[j].name) > 0)
+                        swap = true;
+                }
+
+                if (swap) {
+                    DirEntry tmp = entries[i];
+                    entries[i] = entries[j];
+                    entries[j] = tmp;
+                }
+            }
+        }
+
+        // -------------------------------------------------
+        // Вывод
+        // -------------------------------------------------
+        for (int i = 0; i < count; ++i) {
+            callback(entries[i].name, entries[i].isDir);
+        }
+    }
+
+    bool dirExists(const char* path) {
+        if (!s_inited)
+            return false;
+
+        File f = SD.open(path);
+        if (!f)
+            return false;
+
+        bool isDir = f.isDirectory();
+        f.close();
+        return isDir;
     }
 
 }

@@ -13,4 +13,5 @@ namespace SDCard {
 
     bool readFile(const char* path, char* dst, size_t maxLen);
     void listDir(const char* path, void (*callback)(const char* name, bool isDir));
+    bool dirExists(const char* path);
 }

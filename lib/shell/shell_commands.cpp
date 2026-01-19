@@ -4,6 +4,7 @@
 #include "console.h"
 #include "palette.h"
 #include "esp_system.h"
+#include <SDCard.h>
 #include <string.h>
 
 // сигнатура обработчиков
@@ -22,21 +23,52 @@ static void cmd_font(int argc, const char* const* argv);
 static void cmd_colors(int argc, const char* const* argv);
 static void cmd_pwd(int argc, const char* const* argv);
 static void cmd_cd(int argc, const char* const* argv);
+static void cmd_dir(int argc, const char* const* argv);
 
 static const ShellCommand commands[] = {
+    { "HELP",  cmd_help,  "Get this help" },
     { "CLS",  cmd_cls,  "Clear screen" },
-    { "HELP",  cmd_help,  "Get help" },
     { "REBOOT", cmd_reboot, "Restart system" },
     { "FONT",   cmd_font,  "Show font table" },
     { "COLORS",  cmd_colors,  "Show color palette" },
     { "PWD",  cmd_pwd,  "Show current directory" },
     { "CD",  cmd_cd,  "Change current directory" },
+    { "DIR",  cmd_dir,  "List directory contents" },
     // дальше: DIR, RUN ...
 };
 
 static const int commandCount = sizeof(commands) / sizeof(commands[0]);
 static char hexDigit(uint8_t v) {
     return (v < 10) ? ('0' + v) : ('A' + (v - 10));
+}
+
+static void dirCallback(const char* name, bool isDir) {
+    if (isDir) {
+        console::setColor(COLOR_YELLOW);
+        console::print("<D> ");
+    } else {
+        console::print("    ");
+    }
+
+    console::setColor(COLOR_WHITE);
+    console::printLn(name);
+}
+
+static void cmd_dir(int argc, const char* const* argv) {
+    (void)argc;
+    (void)argv;
+
+    const char* path = shell::getCwd();
+
+    if (!SDCard::init()) {
+        console::setColor(COLOR_RED);
+        console::printLn("SD card not initialized");
+        console::useDefaultColor();
+        return;
+    }
+
+    console::printLn(""); 
+    SDCard::listDir(path, dirCallback);
 }
 
 static void cmd_pwd(int argc, const char* const* argv) {
@@ -54,6 +86,15 @@ static void cmd_cd(int argc, const char* const* argv) {
 
     char newPath[128];
     shell::resolvePath(argv[1], newPath);
+
+    if (!SDCard::dirExists(newPath)) {
+        console::setColor(COLOR_RED);
+        console::print("Directory not found: ");
+        console::printLn(newPath);
+        console::useDefaultColor();;
+        return;
+    }
+
     shell::setCwd(newPath);
 }
 
