@@ -7,7 +7,7 @@
 namespace console {
 
     static uint8_t current_color = COLOR_GREEN;
-    static uint8_t default_color = COLOR_GREEN;
+    static uint8_t default_color = COLOR_WHITE;
 
     // кольцевой буфер символов
     static GUI::Tile buffer[GUI::GRID_H][GUI::GRID_W];
@@ -54,6 +54,10 @@ namespace console {
 
     void setColor(uint8_t color) {
         current_color = color;
+    }
+
+    void useDefaultColor() {
+        current_color = default_color;
     }
 
     static void scrollUp() {

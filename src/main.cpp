@@ -42,6 +42,7 @@ void setup() {
     paletteInit();
     keyboard::init();
 
+    console::setColor(COLOR_GREEN);
     console::printLn("========================================");
     console::printLn("  RETRO CONSOLE OS");
     console::printLn("  ESP32-S3 SYSTEM SHELL");
@@ -56,12 +57,9 @@ void setup() {
     console::printLn("");
     console::printLn("Type HELP for available commands.");
     console::printLn();
+    console::useDefaultColor();
 
     shell::init();
-
-    //initTilemapTest();
-    //initTilemapFontTable();
-    //GUIText::printPaletteTable();
 
     luaManager::luaInit(vga);
     // luaManager::loadAndRunFromSD("/demo.lua");

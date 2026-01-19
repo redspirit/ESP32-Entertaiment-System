@@ -18,15 +18,22 @@ struct ShellCommand {
 static void cmd_cls(int argc, const char* const* argv);
 static void cmd_help(int argc, const char* const* argv);
 static void cmd_reboot(int argc, const char* const* argv);
+static void cmd_font(int argc, const char* const* argv);
+static void cmd_colors(int argc, const char* const* argv);
 
 static const ShellCommand commands[] = {
     { "CLS",  cmd_cls,  "Clear screen" },
     { "HELP",  cmd_help,  "Get help" },
     { "REBOOT", cmd_reboot, "Restart system" },
-    // дальше: DIR, RUN, HELP ...
+    { "FONT",   cmd_font,  "Show font table" },
+    { "COLORS",  cmd_colors,  "Show color palette" },
+    // дальше: DIR, RUN ...
 };
 
 static const int commandCount = sizeof(commands) / sizeof(commands[0]);
+static char hexDigit(uint8_t v) {
+    return (v < 10) ? ('0' + v) : ('A' + (v - 10));
+}
 
 static void cmd_cls(int argc, const char* const* argv) {
     (void)argc;
@@ -92,6 +99,67 @@ static void cmd_reboot(int argc, const char* const* argv) {
 
     console::printLn("Rebooting...");
     esp_restart();
+}
+
+static void cmd_font(int argc, const char* const* argv) {
+    (void)argc;
+    (void)argv;
+
+    console::setColor(COLOR_CYAN);
+    console::printLn("FONT TABLE (0x00 - 0xFF)");
+    console::printLn("════════════════════════");
+
+    for (int base = 0; base < 256; base += 16) {
+
+        console::setColor(COLOR_YELLOW);
+        console::print("0x");
+        console::print(hexDigit((base >> 4) & 0xF));
+        console::print(hexDigit(base & 0xF));
+        console::print(" ");
+
+        // 16 символов
+        console::setColor(COLOR_WHITE);
+        for (int i = 0; i < 16; i++) {
+            char c = (char)(base + i);
+            console::print(c);
+        }
+
+        console::printLn();
+    }
+    console::useDefaultColor();
+
+}
+
+static void cmd_colors(int argc, const char* const* argv) {
+    (void)argc;
+    (void)argv;
+
+    console::setColor(COLOR_CYAN);
+    console::printLn("COLOR PALETTE (0x00 - 0xFF)");
+    for (int i = 0; i < 27; i++) {
+        console::print((char)205);
+    }
+    console::printLn();
+
+    for (int base = 0; base < 256; base += 16) {
+        // Заголовок строки: 0xNN
+        console::setColor(COLOR_YELLOW);
+        console::print("0x");
+        console::print(hexDigit((base >> 4) & 0xF));
+        console::print(hexDigit(base & 0xF));
+        console::print(" ");
+
+        // 16 цветов
+        for (int i = 0; i < 16; i++) {
+            uint8_t color = base + i;
+            console::setColor(color);
+            console::print((char)219); // █
+        }
+
+        console::printLn();
+    }
+    console::useDefaultColor();
+
 }
 
 // ======================
