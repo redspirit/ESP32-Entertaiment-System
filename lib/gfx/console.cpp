@@ -6,10 +6,11 @@
 
 namespace console {
 
-    static uint8_t text_color = COLOR_GREEN;
+    static uint8_t current_color = COLOR_GREEN;
+    static uint8_t default_color = COLOR_GREEN;
 
     // кольцевой буфер символов
-    static char buffer[GUI::GRID_H][GUI::GRID_W];
+    static GUI::Tile buffer[GUI::GRID_H][GUI::GRID_W];
 
     static int head  = 0;   // первая видимая строка
     static int count = 0;   // количество строк в буфере
@@ -35,7 +36,10 @@ namespace console {
     }
 
     static void clearLine(int row) {
-        memset(buffer[row], ' ', GUI::GRID_W);
+        for (int x = 0; x < GUI::GRID_W; x++) {
+            buffer[row][x].ch    = ' ';
+            //buffer[row][x].color = default_color;
+        }
     }
 
     void clear() {
@@ -49,7 +53,7 @@ namespace console {
     }
 
     void setColor(uint8_t color) {
-        text_color = color;
+        current_color = color;
     }
 
     static void scrollUp() {
@@ -79,10 +83,9 @@ namespace console {
 
         for (int y = 0; y < GUI::GRID_H; y++) {
             int src = (head + y) % GUI::GRID_H;
-            for (int x = 0; x < GUI::GRID_W; x++) {
-                TILE(map, x, y).ch    = buffer[src][x];
-                TILE(map, x, y).color = text_color;
-            }
+            memcpy(&map[y * GUI::GRID_W],
+                buffer[src],
+                sizeof(GUI::Tile) * GUI::GRID_W);
         }
     }
 
@@ -91,6 +94,7 @@ namespace console {
             newLine();
 
         for (const char* p = text; *p; ++p) {
+
             if (*p == '\n') {
                 newLine();
                 continue;
@@ -100,7 +104,10 @@ namespace console {
                 newLine();
 
             int row = (head + cy) % GUI::GRID_H;
-            buffer[row][cx++] = *p;
+
+            buffer[row][cx].ch    = *p;
+            buffer[row][cx].color = current_color;
+            cx++;
         }
 
         flush();
@@ -140,7 +147,7 @@ namespace console {
         if (y < 0 || y >= GUI::GRID_H) return;
 
         int row = (head + y) % GUI::GRID_H;
-        buffer[row][x] = ' ';
+        buffer[row][x].ch = ' ';
         flush();
     }
 
