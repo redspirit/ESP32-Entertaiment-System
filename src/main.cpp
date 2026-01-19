@@ -41,15 +41,23 @@ void setup() {
 
     paletteInit();
     keyboard::init();
-    shell::init();
 
-    // console::print("Loading");
-    // console::print("...");
-    // console::printLn(" OK");
-    // console::printLn();
-    // console::printLn();
-    // console::printLn("Welcome");
-    // console::print("> ");
+    console::printLn("========================================");
+    console::printLn("  RETRO CONSOLE OS");
+    console::printLn("  ESP32-S3 SYSTEM SHELL");
+    console::printLn("");
+    console::printLn("  CPU   : ESP32-S3");
+    console::printLn("  VIDEO : TILEMAP VGA");
+    console::printLn("  INPUT : PS/2 KEYBOARD");
+    console::printLn("  MEDIA : SD CARD");
+    console::printLn("");
+    console::printLn("  (c) 2026  Alexey");
+    console::printLn("========================================");
+    console::printLn("");
+    console::printLn("Type HELP for available commands.");
+    console::printLn();
+
+    shell::init();
 
     //initTilemapTest();
     //initTilemapFontTable();

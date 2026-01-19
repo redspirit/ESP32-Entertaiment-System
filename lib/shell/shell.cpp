@@ -4,6 +4,8 @@
 #include "keyboard.h"
 #include "scancodes.h"
 #include "GUIText.h"
+#include "shell_parser.h"
+#include "shell_commands.h"
 #include <string.h>
 
 #define SHELL_CMD_MAX 64
@@ -25,20 +27,25 @@ namespace shell {
         console::print(cmd);
     }
 
-    static void executeCommand(const char* cmd) {
-        console::printLn(); // перенос строки
-        console::printLn("OK");
-        cursor_y++;
+    static void executeCommand(char* cmd) {
+        ParsedCommand pc;
 
-        LOG.println(cmd);
+        console::printLn();
+        if (!parseCommand(cmd, pc))
+            return;
+
+        shellExecute(pc);
     }
 
     void init() {
         memset(cmd, 0, sizeof(cmd));
         len = 0;
 
+        int cx, cy;
+        console::getCursor(cx, cy);
+
         cursor_x   = PROMPT_LEN;
-        cursor_y   = 0;
+        cursor_y   = cy;
         cursor_pos = 0;
 
         console::print(PROMPT_STR);
@@ -98,6 +105,9 @@ namespace shell {
     void onKeyEnter() {
         executeCommand(cmd);
 
+        int cx, cy;
+        console::getCursor(cx, cy);
+
         // сброс строки
         memset(cmd, 0, sizeof(cmd));
         len = 0;
@@ -105,7 +115,7 @@ namespace shell {
 
         console::print(PROMPT_STR);
         cursor_x = PROMPT_LEN;
-        cursor_y++;
+        cursor_y = cy;
 
         console::setCursor(cursor_x, cursor_y);
         GUIText::moveCursor(cursor_x, cursor_y);

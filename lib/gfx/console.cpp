@@ -6,7 +6,7 @@
 
 namespace console {
 
-static uint8_t text_color = 28;
+    static uint8_t text_color = COLOR_GREEN;
 
     // кольцевой буфер символов
     static char buffer[GUI::GRID_H][GUI::GRID_W];
@@ -109,6 +109,17 @@ static uint8_t text_color = 28;
     void print(char c) {
         char buf[2] = { c, 0 };
         print(buf);
+    }
+
+    void print(int value) {
+        char buf[12]; // достаточно для int32
+        itoa(value, buf, 10);
+        print(buf);
+    }    
+    
+    void printLn(int value) {
+        print(value);
+        printLn();
     }
 
     void printLn(const char* text) {

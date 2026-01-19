@@ -9,7 +9,9 @@ namespace console {
     void print(char c);
     void printLn(const char* text);
     void printLn();
+    void print(int value);
+    void printLn(int value);
     void clearCharAt(int x, int y);
     void setCursor(int x, int y);
-    void getCursor(int& x, int& y);    
+    void getCursor(int& x, int& y);
 }
