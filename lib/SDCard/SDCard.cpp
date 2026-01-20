@@ -232,4 +232,45 @@ namespace SDCard {
         return SD.remove(path);
     }    
 
+    bool writeTextFile(const char* path, const char* text) {
+        if (!s_inited)
+            return false;
+
+        // если файл существует — удаляем
+        if (SD.exists(path)) {
+            SD.remove(path);
+        }
+
+        File f = SD.open(path, FILE_WRITE);
+        if (!f)
+            return false;
+
+        if (text && *text) {
+            f.print(text);
+            f.print("\n");
+        }
+
+        f.close();
+        return true;
+    }
+
+    bool appendTextFile(const char* path, const char* text) {
+        if (!s_inited)
+            return false;
+
+        File f = SD.open(path, FILE_WRITE);
+        if (!f)
+            return false;
+
+        f.seek(f.size()); // в конец
+
+        if (text && *text) {
+            f.print(text);
+            f.print("\n");
+        }
+
+        f.close();
+        return true;
+    }
+
 }

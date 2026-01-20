@@ -6,9 +6,11 @@
 #include "esp_system.h"
 #include <SDCard.h>
 #include <string.h>
+#include <luaManager.h>
 
 #define MAX_PATH 128
 #define TYPE_MAX_SIZE 1024
+#define LUA_OUT_MAX 128
 
 // сигнатура обработчиков
 typedef void (*CommandHandler)(int argc, const char* const* argv);
@@ -33,6 +35,9 @@ static void cmd_type(int argc, const char* const* argv);
 static void cmd_mkdir(int argc, const char* const* argv);
 static void cmd_rd(int argc, const char* const* argv);
 static void cmd_del(int argc, const char* const* argv);
+static void cmd_write(int argc, const char* const* argv);
+static void cmd_append(int argc, const char* const* argv);
+static void cmd_lua(int argc, const char* const* argv);
 
 static const ShellCommand commands[] = {
     { "HELP",  cmd_help,  "Get this help" },
@@ -47,6 +52,9 @@ static const ShellCommand commands[] = {
     { "RD",    cmd_rd,    "Remove empty directory" },
     { "DEL",   cmd_del,   "Delete file" },
     { "MKDIR", cmd_mkdir, "Create directory" },
+    { "WRITE",  cmd_write,  "Write text file or create empty" },
+    { "APPEND", cmd_append, "Append text to file" },
+    { "LUA", cmd_lua, "Execute Lua expression" },
 };
 
 static const int commandCount = sizeof(commands) / sizeof(commands[0]);
@@ -65,6 +73,80 @@ static void dirCallback(const char* name, bool isDir) {
 
     console::setColor(COLOR_WHITE);
     console::printLn(name);
+}
+
+static const char* getTextArg(int argc, const char* const* argv) {
+    if (argc < 3)
+        return nullptr;
+
+    return argv[2];
+}
+
+static void cmd_lua(int argc, const char* const* argv) {
+    if (argc < 2) {
+        console::setColor(COLOR_RED);
+        console::printLn("Usage: LUA <expression>");
+        console::useDefaultColor();
+        return;
+    }
+
+    // всё после LUA — выражение
+    const char* expr = argv[1];
+
+    char out[LUA_OUT_MAX];
+
+    if (!luaManager::runExpression(expr, out, sizeof(out))) {
+        console::setColor(COLOR_RED);
+        console::printLn(out[0] ? out : "Lua error");
+        console::useDefaultColor();
+        return;
+    }
+
+    console::printLn(out);
+}
+
+static void cmd_write(int argc, const char* const* argv) {
+    if (argc < 2) {
+        console::setColor(COLOR_RED);
+        console::printLn("Usage: WRITE <file> [text]");
+        console::useDefaultColor();
+        return;
+    }
+
+    char path[MAX_PATH];
+    shell::resolvePath(argv[1], path);
+
+    const char* text = getTextArg(argc, argv);
+
+    if (!SDCard::init() || !SDCard::writeTextFile(path, text)) {
+        console::setColor(COLOR_RED);
+        console::print("Cannot write file: ");
+        console::printLn(path);
+        console::useDefaultColor();
+        return;
+    }
+}
+
+static void cmd_append(int argc, const char* const* argv) {
+    if (argc < 3) {
+        console::setColor(COLOR_RED);
+        console::printLn("Usage: APPEND <file> <text>");
+        console::useDefaultColor();
+        return;
+    }
+
+    char path[MAX_PATH];
+    shell::resolvePath(argv[1], path);
+
+    const char* text = getTextArg(argc, argv);
+
+    if (!SDCard::init() || !SDCard::appendTextFile(path, text)) {
+        console::setColor(COLOR_RED);
+        console::print("Cannot append file: ");
+        console::printLn(path);
+        console::useDefaultColor();
+        return;
+    }
 }
 
 static void cmd_type(int argc, const char* const* argv) {
@@ -128,14 +210,12 @@ static void cmd_dir(int argc, const char* const* argv) {
         return;
     }
 
-    console::printLn(""); // пустая строка перед выводом
-
     s_dirEmpty = true;
     SDCard::listDir(path, dirCallback);
 
     if (s_dirEmpty) {
         console::setColor(COLOR_YELLOW);
-        console::printLn("Directory is empty");
+        console::printLn("<empty>");
         console::useDefaultColor();
     }
 }

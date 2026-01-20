@@ -22,6 +22,9 @@ namespace SDCard {
     bool fileExists(const char* path);
     size_t fileSize(const char* path);
 
+    bool writeTextFile(const char* path, const char* text);
+    bool appendTextFile(const char* path, const char* text);    
+
     // читает файл, если размер <= maxLen
     // возвращает false если файл не существует или слишком большой
     bool readTextFileLimited(

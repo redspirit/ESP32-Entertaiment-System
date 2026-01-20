@@ -137,6 +137,47 @@ namespace luaManager {
 
         cacheCallbacks();
         return true;
-    }    
+    }
+
+    bool runExpression(const char* expr, char* out, size_t outSize) {
+        if (!L || !expr || !out || outSize == 0)
+            return false;
+
+        lua_settop(L, 0);
+
+        // формируем: return <expr>
+        char buf[256];
+        snprintf(buf, sizeof(buf), "return %s", expr);
+
+        if (luaL_dostring(L, buf) != LUA_OK) {
+            const char* err = lua_tostring(L, -1);
+            if (err && outSize > 1) {
+                strncpy(out, err, outSize - 1);
+                out[outSize - 1] = 0;
+            }
+            lua_pop(L, 1);
+            return false;
+        }
+
+        // ожидаем результат в стеке
+        if (lua_gettop(L) == 0) {
+            strncpy(out, "nil", outSize);
+            return true;
+        }
+
+        // преобразуем результат в строку (Lua way)
+        const char* str = luaL_tolstring(L, -1, nullptr);
+        if (!str) {
+            strncpy(out, "<non-printable>", outSize);
+            return true;
+        }
+
+        strncpy(out, str, outSize - 1);
+        out[outSize - 1] = 0;
+
+        lua_pop(L, 2); // результат + строка
+        return true;
+    }
+
 
 }
