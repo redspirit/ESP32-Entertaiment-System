@@ -7,6 +7,9 @@
 #include <SDCard.h>
 #include <string.h>
 
+#define MAX_PATH 128
+#define TYPE_MAX_SIZE 1024
+
 // сигнатура обработчиков
 typedef void (*CommandHandler)(int argc, const char* const* argv);
 
@@ -24,6 +27,7 @@ static void cmd_colors(int argc, const char* const* argv);
 static void cmd_pwd(int argc, const char* const* argv);
 static void cmd_cd(int argc, const char* const* argv);
 static void cmd_dir(int argc, const char* const* argv);
+static void cmd_type(int argc, const char* const* argv);
 
 static const ShellCommand commands[] = {
     { "HELP",  cmd_help,  "Get this help" },
@@ -34,6 +38,7 @@ static const ShellCommand commands[] = {
     { "PWD",  cmd_pwd,  "Show current directory" },
     { "CD",  cmd_cd,  "Change current directory" },
     { "DIR",  cmd_dir,  "List directory contents" },
+    { "TYPE",  cmd_type,  "Display text file" },
     // дальше: DIR, RUN ...
 };
 
@@ -54,11 +59,16 @@ static void dirCallback(const char* name, bool isDir) {
     console::printLn(name);
 }
 
-static void cmd_dir(int argc, const char* const* argv) {
-    (void)argc;
-    (void)argv;
+static void cmd_type(int argc, const char* const* argv) {
+    if (argc < 2) {
+        console::setColor(COLOR_RED);
+        console::printLn("Usage: TYPE <file>");
+        console::useDefaultColor();
+        return;
+    }
 
-    const char* path = shell::getCwd();
+    char path[MAX_PATH];
+    shell::resolvePath(argv[1], path);
 
     if (!SDCard::init()) {
         console::setColor(COLOR_RED);
@@ -67,7 +77,50 @@ static void cmd_dir(int argc, const char* const* argv) {
         return;
     }
 
-    console::printLn(""); 
+    char buffer[TYPE_MAX_SIZE + 1];
+
+    if (!SDCard::readTextFileLimited(path, buffer, TYPE_MAX_SIZE)) {
+        console::setColor(COLOR_RED);
+        console::printLn("File not found or too large (max 1 KB)");
+        console::useDefaultColor();
+        return;
+    }
+
+    console::printLn("");
+    console::printLn(buffer);
+}
+
+static void cmd_dir(int argc, const char* const* argv) {
+    (void)argc;
+    (void)argv;
+
+    char path[MAX_PATH];
+
+    // DIR или DIR <path>
+    if (argc > 1) {
+        shell::resolvePath(argv[1], path);
+    } else {
+        strncpy(path, shell::getCwd(), MAX_PATH);
+        path[MAX_PATH - 1] = 0;
+    }
+
+    if (!SDCard::init()) {
+        console::setColor(COLOR_RED);
+        console::printLn("SD card not initialized");
+        console::useDefaultColor();
+        return;
+    }
+
+    // проверка, что это директория
+    if (!SDCard::dirExists(path)) {
+        console::setColor(COLOR_RED);
+        console::print("Directory not found: ");
+        console::printLn(path);
+        console::useDefaultColor();
+        return;
+    }
+
+    console::printLn(""); // пустая строка перед выводом
     SDCard::listDir(path, dirCallback);
 }
 
@@ -84,7 +137,7 @@ static void cmd_cd(int argc, const char* const* argv) {
         return;
     }
 
-    char newPath[128];
+    char newPath[MAX_PATH];
     shell::resolvePath(argv[1], newPath);
 
     if (!SDCard::dirExists(newPath)) {
@@ -170,7 +223,8 @@ static void cmd_font(int argc, const char* const* argv) {
 
     console::setColor(COLOR_CYAN);
     console::printLn("FONT TABLE (0x00 - 0xFF)");
-    console::printLn("------------------------");
+    console::printRawChar((char)205, 24);
+    console::printLn();
 
     for (int base = 0; base < 256; base += 16) {
 
@@ -183,14 +237,13 @@ static void cmd_font(int argc, const char* const* argv) {
         // 16 символов
         console::setColor(COLOR_WHITE);
         for (int i = 0; i < 16; i++) {
-            char c = (char)(base + i);
-            console::print(c);
+            console::printRawChar((char)(base + i));
         }
 
         console::printLn();
     }
-    console::useDefaultColor();
 
+    console::useDefaultColor();
 }
 
 static void cmd_colors(int argc, const char* const* argv) {
@@ -199,9 +252,7 @@ static void cmd_colors(int argc, const char* const* argv) {
 
     console::setColor(COLOR_CYAN);
     console::printLn("COLOR PALETTE (0x00 - 0xFF)");
-    for (int i = 0; i < 27; i++) {
-        console::print((char)205);
-    }
+    console::printRawChar((char)205, 27);
     console::printLn();
 
     for (int base = 0; base < 256; base += 16) {

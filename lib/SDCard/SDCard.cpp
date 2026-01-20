@@ -139,4 +139,97 @@ namespace SDCard {
         return isDir;
     }
 
+    bool fileExists(const char* path) {
+        if (!s_inited)
+            return false;
+
+        File f = SD.open(path, FILE_READ);
+        if (!f)
+            return false;
+
+        bool ok = !f.isDirectory();
+        f.close();
+        return ok;
+    }
+
+    size_t fileSize(const char* path) {
+        if (!s_inited)
+            return 0;
+
+        File f = SD.open(path, FILE_READ);
+        if (!f)
+            return 0;
+
+        size_t size = f.size();
+        f.close();
+        return size;
+    }
+
+    bool readTextFileLimited(const char* path, char* dst, size_t maxLen, size_t* outSize) {
+        if (!s_inited)
+            return false;
+
+        File f = SD.open(path, FILE_READ);
+        if (!f || f.isDirectory())
+            return false;
+
+        size_t size = f.size();
+        if (size > maxLen) {
+            f.close();
+            return false;
+        }
+
+        f.readBytes(dst, size);
+        dst[size] = 0;
+
+        if (outSize)
+            *outSize = size;
+
+        f.close();
+        return true;
+    }
+
+
+    bool mkdir(const char* path) {
+        if (!s_inited)
+            return false;
+
+        // SD.mkdir вернёт false, если не удалось
+        return SD.mkdir(path);
+    }
+
+    bool SDCard::rmdirEmpty(const char* path) {
+        if (!s_inited)
+            return false;
+
+        File dir = SD.open(path);
+        if (!dir || !dir.isDirectory())
+            return false;
+
+        // проверяем, что директория пустая
+        File entry = dir.openNextFile();
+        if (entry) {
+            entry.close();
+            dir.close();
+            return false; // не пустая
+        }
+
+        dir.close();
+        return SD.rmdir(path);
+    }
+
+    bool removeFile(const char* path) {
+        if (!s_inited)
+            return false;
+
+        File f = SD.open(path);
+        if (!f || f.isDirectory()) {
+            if (f) f.close();
+            return false;
+        }
+
+        f.close();
+        return SD.remove(path);
+    }    
+
 }

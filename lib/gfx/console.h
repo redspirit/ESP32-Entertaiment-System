@@ -8,6 +8,7 @@ namespace console {
     void useDefaultColor(); // устанавливает текущий цвет цветом по умолчанию
     void print(const char* text);
     void print(char c);
+    void printRawChar(char c, uint16_t repeat = 1);
     void printLn(const char* text);
     void printLn();
     void print(int value);

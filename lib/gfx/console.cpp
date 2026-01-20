@@ -93,6 +93,21 @@ namespace console {
         }
     }
 
+    void printRawChar(char c, uint16_t repeat) {
+        while (repeat--) {
+            if (cx >= GUI::GRID_W)
+                newLine();
+
+            int row = (head + cy) % GUI::GRID_H;
+
+            buffer[row][cx].ch    = c;
+            buffer[row][cx].color = current_color;
+
+            cx++;
+        }
+        flush();
+    }
+
     void print(const char* text) {
         if (count == 0)
             newLine();
