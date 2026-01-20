@@ -198,7 +198,7 @@ namespace SDCard {
         return SD.mkdir(path);
     }
 
-    bool SDCard::rmdirEmpty(const char* path) {
+    bool rmdirEmpty(const char* path) {
         if (!s_inited)
             return false;
 

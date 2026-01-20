@@ -19,6 +19,8 @@ struct ShellCommand {
     const char*    help;
 };
 
+static bool s_dirEmpty;
+
 static void cmd_cls(int argc, const char* const* argv);
 static void cmd_help(int argc, const char* const* argv);
 static void cmd_reboot(int argc, const char* const* argv);
@@ -28,6 +30,9 @@ static void cmd_pwd(int argc, const char* const* argv);
 static void cmd_cd(int argc, const char* const* argv);
 static void cmd_dir(int argc, const char* const* argv);
 static void cmd_type(int argc, const char* const* argv);
+static void cmd_mkdir(int argc, const char* const* argv);
+static void cmd_rd(int argc, const char* const* argv);
+static void cmd_del(int argc, const char* const* argv);
 
 static const ShellCommand commands[] = {
     { "HELP",  cmd_help,  "Get this help" },
@@ -39,7 +44,9 @@ static const ShellCommand commands[] = {
     { "CD",  cmd_cd,  "Change current directory" },
     { "DIR",  cmd_dir,  "List directory contents" },
     { "TYPE",  cmd_type,  "Display text file" },
-    // дальше: DIR, RUN ...
+    { "RD",    cmd_rd,    "Remove empty directory" },
+    { "DEL",   cmd_del,   "Delete file" },
+    { "MKDIR", cmd_mkdir, "Create directory" },
 };
 
 static const int commandCount = sizeof(commands) / sizeof(commands[0]);
@@ -48,6 +55,7 @@ static char hexDigit(uint8_t v) {
 }
 
 static void dirCallback(const char* name, bool isDir) {
+    s_dirEmpty = false;
     if (isDir) {
         console::setColor(COLOR_YELLOW);
         console::print("<D> ");
@@ -121,7 +129,15 @@ static void cmd_dir(int argc, const char* const* argv) {
     }
 
     console::printLn(""); // пустая строка перед выводом
+
+    s_dirEmpty = true;
     SDCard::listDir(path, dirCallback);
+
+    if (s_dirEmpty) {
+        console::setColor(COLOR_YELLOW);
+        console::printLn("Directory is empty");
+        console::useDefaultColor();
+    }
 }
 
 static void cmd_pwd(int argc, const char* const* argv) {
@@ -274,6 +290,66 @@ static void cmd_colors(int argc, const char* const* argv) {
     }
     console::useDefaultColor();
 
+}
+
+static void cmd_mkdir(int argc, const char* const* argv) {
+    if (argc < 2) {
+        console::setColor(COLOR_RED);
+        console::printLn("Usage: MKDIR <dir>");
+        console::useDefaultColor();
+        return;
+    }
+
+    char path[MAX_PATH];
+    shell::resolvePath(argv[1], path);
+
+    if (!SDCard::init() || !SDCard::mkdir(path)) {
+        console::setColor(COLOR_RED);
+        console::print("Cannot create directory: ");
+        console::printLn(path);
+        console::useDefaultColor();
+        return;
+    }
+}
+
+static void cmd_rd(int argc, const char* const* argv) {
+    if (argc < 2) {
+        console::setColor(COLOR_RED);
+        console::printLn("Usage: RD <dir>");
+        console::useDefaultColor();
+        return;
+    }
+
+    char path[MAX_PATH];
+    shell::resolvePath(argv[1], path);
+
+    if (!SDCard::init() || !SDCard::rmdirEmpty(path)) {
+        console::setColor(COLOR_RED);
+        console::print("Cannot remove directory (not empty?): ");
+        console::printLn(path);
+        console::useDefaultColor();
+        return;
+    }
+}
+
+static void cmd_del(int argc, const char* const* argv) {
+    if (argc < 2) {
+        console::setColor(COLOR_RED);
+        console::printLn("Usage: DEL <file>");
+        console::useDefaultColor();
+        return;
+    }
+
+    char path[MAX_PATH];
+    shell::resolvePath(argv[1], path);
+
+    if (!SDCard::init() || !SDCard::removeFile(path)) {
+        console::setColor(COLOR_RED);
+        console::print("Cannot delete file: ");
+        console::printLn(path);
+        console::useDefaultColor();
+        return;
+    }
 }
 
 // ======================
