@@ -15,6 +15,9 @@
 #define PROMPT_STR "> "
 #define MAX_PATH 128
 
+#define HISTORY_SIZE     10
+#define HISTORY_CMD_MAX  SHELL_CMD_MAX
+
 namespace shell {
 
     static char cmd[SHELL_CMD_MAX];
@@ -25,6 +28,11 @@ namespace shell {
     static int cursor_pos = 0; // позиция внутри cmd[]
     static char cwd[MAX_PATH] = "/";
     static char promptPath[PROMPT_PATH_MAX + 1];
+
+    static char history[HISTORY_SIZE][HISTORY_CMD_MAX];
+    static int  history_count = 0;     // сколько реально записано
+    static int  history_head  = 0;     // куда писать следующую
+    static int  history_pos   = -1;    // позиция навигации (↑↓)
 
     static void redrawLine() {
         // перерисовываем текущую строку целиком
@@ -195,6 +203,75 @@ namespace shell {
         GUIText::moveCursor(cursor_x, cursor_y);
     }
 
+    static void historyAdd(const char* line) {
+        if (!line || !line[0])
+            return;
+
+        // не добавляем, если повтор последней
+        if (history_count > 0) {
+            int last = (history_head - 1 + HISTORY_SIZE) % HISTORY_SIZE;
+            if (strcmp(history[last], line) == 0)
+                return;
+        }
+
+        strncpy(history[history_head], line, HISTORY_CMD_MAX);
+        history[history_head][HISTORY_CMD_MAX - 1] = 0;
+
+        history_head = (history_head + 1) % HISTORY_SIZE;
+        if (history_count < HISTORY_SIZE)
+            history_count++;
+
+        history_pos = -1; // сброс навигации
+    }    
+
+    static void clearInputLine() {
+        int promptLen = getPromptLength();
+
+        for (int i = 0; i < len; ++i) {
+            console::clearCharAt(promptLen + i, cursor_y);
+        }
+
+        len = 0;
+        cursor_pos = 0;
+
+        cursor_x = promptLen;
+        console::setCursor(cursor_x, cursor_y);
+        GUIText::moveCursor(cursor_x, cursor_y);
+    }
+
+    static void loadHistoryLine(const char* line) {
+        int promptLen = getPromptLength();
+
+        // 1. стереть старый ввод
+        for (int i = 0; i < len; ++i) {
+            console::clearCharAt(promptLen + i, cursor_y);
+        }
+
+        // 2. сброс состояния ввода
+        len = 0;
+        cursor_pos = 0;
+
+        // 3. переместить курсор В НАЧАЛО строки ввода
+        cursor_x = promptLen;
+        console::setCursor(cursor_x, cursor_y);
+        GUIText::moveCursor(cursor_x, cursor_y);
+
+        // 4. скопировать команду
+        strncpy(cmd, line, SHELL_CMD_MAX);
+        cmd[SHELL_CMD_MAX - 1] = 0;
+        len = strlen(cmd);
+        cursor_pos = len;
+
+        // 5. напечатать команду
+        console::print(cmd);
+
+        // 6. поставить курсор в конец
+        cursor_x = promptLen + cursor_pos;
+        console::setCursor(cursor_x, cursor_y);
+        GUIText::moveCursor(cursor_x, cursor_y);
+    }
+
+
     void onKeyBack() {
         if (cursor_pos == 0)
             return;
@@ -221,6 +298,8 @@ namespace shell {
     }
 
     void onKeyEnter() {
+        cmd[len] = 0;
+        historyAdd(cmd);        
         executeCommand(cmd);
 
         int cx, cy;
@@ -261,6 +340,47 @@ namespace shell {
         GUIText::moveCursor(cursor_x, cursor_y);
     }    
 
+    void onKeyUp() {
+        if (history_count == 0)
+            return;
+
+        if (history_pos < history_count - 1)
+            history_pos++;
+
+        int index = (history_head - 1 - history_pos + HISTORY_SIZE) % HISTORY_SIZE;
+        loadHistoryLine(history[index]);
+    }
+
+    void onKeyDown() {
+        if (history_pos < 0)
+            return;
+
+        history_pos--;
+
+        int promptLen = getPromptLength();
+
+        if (history_pos < 0) {
+            // стереть текущий ввод с экрана
+            for (int i = 0; i < len; ++i) {
+                console::clearCharAt(promptLen + i, cursor_y);
+            }
+
+            // полностью сбросить состояние ввода
+            cmd[0] = 0;
+            len = 0;
+            cursor_pos = 0;
+
+            cursor_x = promptLen;
+            console::setCursor(cursor_x, cursor_y);
+            GUIText::moveCursor(cursor_x, cursor_y);
+
+            return;
+        }
+
+        int index = (history_head - 1 - history_pos + HISTORY_SIZE) % HISTORY_SIZE;
+        loadHistoryLine(history[index]);
+    }
+
     void update(float dt) {
         GUIText::tick(dt);
 
@@ -284,6 +404,15 @@ namespace shell {
         if (keyboard::isJustPressed(Key::RIGHT)) {
             onKeyRight();
         }
+
+        if (keyboard::isJustPressed(Key::UP)) {
+            onKeyUp();
+        }
+
+        if (keyboard::isJustPressed(Key::DOWN)) {
+            onKeyDown();
+        }
+        
 
     }
 

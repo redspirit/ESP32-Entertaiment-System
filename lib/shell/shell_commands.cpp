@@ -7,6 +7,7 @@
 #include <SDCard.h>
 #include <string.h>
 #include <luaManager.h>
+#include <esp_heap_caps.h>
 
 #define MAX_PATH 128
 #define TYPE_MAX_SIZE 1024
@@ -38,6 +39,7 @@ static void cmd_del(int argc, const char* const* argv);
 static void cmd_write(int argc, const char* const* argv);
 static void cmd_append(int argc, const char* const* argv);
 static void cmd_lua(int argc, const char* const* argv);
+static void cmd_mem(int argc, const char* const* argv);
 
 static const ShellCommand commands[] = {
     { "HELP",  cmd_help,  "Get this help" },
@@ -55,6 +57,7 @@ static const ShellCommand commands[] = {
     { "WRITE",  cmd_write,  "Write text file or create empty" },
     { "APPEND", cmd_append, "Append text to file" },
     { "LUA", cmd_lua, "Execute Lua expression" },
+    { "MEM", cmd_mem, "Show memory info" },
 };
 
 static const int commandCount = sizeof(commands) / sizeof(commands[0]);
@@ -80,6 +83,62 @@ static const char* getTextArg(int argc, const char* const* argv) {
         return nullptr;
 
     return argv[2];
+}
+
+static void cmd_mem(int argc, const char* const* argv) {
+    (void)argc;
+    (void)argv;
+
+    // ---------- Internal RAM ----------
+    uint32_t ram_total = heap_caps_get_total_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
+    uint32_t ram_free  = heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
+    uint32_t ram_min   = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
+
+    // ---------- PSRAM ----------
+    uint32_t psram_total = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+    uint32_t psram_free  = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    uint32_t psram_min   = heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM);
+
+    console::printLn("INTERNAL RAM");
+    console::print("  TOTAL: ");
+    console::print((int)(ram_total >> 10));
+    console::printLn(" KB");
+
+    console::print("  FREE : ");
+    console::print((int)(ram_free >> 10));
+    console::printLn(" KB");
+
+    console::print("  USED : ");
+    console::print((int)((ram_total - ram_free) >> 10));
+    console::printLn(" KB");
+
+    console::print("  MIN  : ");
+    console::print((int)(ram_min >> 10));
+    console::printLn(" KB");
+
+    if (psram_total > 0) {
+        console::printLn("");
+        console::printLn("PSRAM");
+
+        console::print("  TOTAL: ");
+        console::print((int)(psram_total >> 10));
+        console::printLn(" KB");
+
+        console::print("  FREE : ");
+        console::print((int)(psram_free >> 10));
+        console::printLn(" KB");
+
+        console::print("  USED : ");
+        console::print((int)((psram_total - psram_free) >> 10));
+        console::printLn(" KB");
+
+        console::print("  MIN  : ");
+        console::print((int)(psram_min >> 10));
+        console::printLn(" KB");
+    } else {
+        console::printLn("");
+        console::printLn("PSRAM: NOT PRESENT");
+    }
 }
 
 static void cmd_lua(int argc, const char* const* argv) {

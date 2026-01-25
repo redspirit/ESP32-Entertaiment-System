@@ -20,6 +20,7 @@ const PinConfig pins(
 
 VGA vga;
 Mode mode = Mode::MODE_320x240x60;
+//Mode mode = Mode::MODE_640x480x60;
 
 
 void setup() {
