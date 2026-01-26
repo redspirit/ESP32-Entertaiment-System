@@ -1,35 +1,27 @@
-#ifndef MODE_H
-#define MODE_H
+#pragma once
+
 #include <stdint.h>
 
 class Mode;
 class Mode
 {
 	public:
+	static const Mode MODE_320x240x60;
+	static const Mode MODE_640x480x60;
 	static const Mode MODE_640x400x70;
 	static const Mode MODE_320x200x70;
-	static const Mode MODE_640x480x60;
-	static const Mode MODE_320x240x60;
 	static const Mode MODE_800x600x56;
 	static const Mode MODE_800x600x60;
-	static const Mode MODE_400x300x60;
-	static const Mode MODE_1024x768x43;
-	static const Mode MODE_1024x768x60;
-	static const Mode MODE_1280x720x60;
 
 	public:
 	uint32_t hFront, hSync, hBack, hRes, hPol;
 	uint32_t vFront, vSync, vBack, vRes, vPol, vClones;
 	uint32_t frequency;
 	
-	Mode()
-	{
+	Mode() {
 	}
 	
-	Mode(const 
-	
-	Mode &m)
-	{
+	Mode(const Mode &m) {
 		this->hFront = m.hFront;
 		this->hSync = m.hSync;
 		this->hBack = m.hBack;
@@ -63,25 +55,19 @@ class Mode
 		this->vClones = vClones;
 	}
 
-	int totalHorizontal() const
-	{
+	int totalHorizontal() const {
 		return hFront + hSync + hBack + hRes;
 	}
 
-	int totalVertical() const
-	{
+	int totalVertical() const {
 		return vFront + vSync + vBack + vRes * vClones;
 	}
 
-	int blankHorizontal() const
-	{
+	int blankHorizontal() const {
 		return hFront + hSync + hBack;
 	}
 
-	int blankVertical() const
-	{
+	int blankVertical() const {
 		return vFront + vSync + vBack;
 	}
 };
-
-#endif //MODE_h

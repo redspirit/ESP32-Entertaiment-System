@@ -1,5 +1,4 @@
-#ifndef VGA_H
-#define VGA_H
+#pragma once
 
 #include "PinConfig.h"
 #include "Mode.h"
@@ -31,5 +30,3 @@ class VGA
 	protected:
 		void attachPinToSignal(int pin, int signal);
 };
-
-#endif //VGA_h

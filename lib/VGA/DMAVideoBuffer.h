@@ -1,3 +1,4 @@
+#pragma once
 
 #include <hal/dma_types.h>
 #include "spiram.h"

@@ -1,6 +1,5 @@
+#pragma once
 
-#ifndef PINCONFIG_H
-#define PINCONFIG_H
 class PinConfig;
 class PinConfig
 {
@@ -27,4 +26,3 @@ class PinConfig
 			this->vSync = vSync;
 		}
 };
-#endif //PINCONFIG_H
