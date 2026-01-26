@@ -28,26 +28,22 @@ class DMAVideoBuffer
 	static const int ALIGNMENT_PSRAM = 64;
 	static const int ALIGNMENT_SRAM = 4;
 
-	void attachBuffer(int b = 0)
-	{
+	void attachBuffer(int b = 0) {
 		for(int i = 0; i < lines; i++) 
 			for(int j = 0; j < clones; j++)
 				descriptors[i * clones + j].buffer = buffer[b][i];
 	}
 
-	uint8_t *getLineAddr8(int y ,int b = 0)
-	{
+	uint8_t *getLineAddr8(int y ,int b = 0) {
 		return (uint8_t*)buffer[b][y];
 	}
 
 
-	uint16_t *getLineAddr16(int y ,int b = 0)
-	{
+	uint16_t *getLineAddr16(int y ,int b = 0) {
 		return (uint16_t*)buffer[b][y];
 	}
 
-	DMAVideoBuffer(int lines, int lineSize, int clones = 1, bool ring = true, bool psram = true, int bufferCount = 1)
-	{
+	DMAVideoBuffer(int lines, int lineSize, int clones = 1, bool ring = true, bool psram = true, int bufferCount = 1) {
 		this->lineSize = lineSize;
 		this->psram = psram;
 		this->bufferCount = bufferCount;
@@ -104,8 +100,7 @@ class DMAVideoBuffer
 		valid = true;
 	}
 
-	~DMAVideoBuffer()
-	{
+	~DMAVideoBuffer() {
 		if(descriptors)
 			heap_caps_free(descriptors);
 		for(int i = 0; i < bufferCount; i++)		
@@ -114,30 +109,25 @@ class DMAVideoBuffer
 					heap_caps_free(buffer[i][j]);
 	}
 
-	dma_descriptor_t *getDescriptor(int i = 0) const
-	{
+	dma_descriptor_t *getDescriptor(int i = 0) const {
 		return &descriptors[0];
 	}
 
-	int getDescriptorCount() const
-	{
+	int getDescriptorCount() const {
 		return descriptorCount;
 	}
 
-	int getLineSize() const
-	{
+	int getLineSize() const {
 		return lineSize;
 	}
 
-	void flush(int b = 0)
-	{
+	void flush(int b = 0) {
 		if(!psram) return;
 		for(int y = 0; y < lines; y++)
 			Cache_WriteBack_Addr((uint32_t)buffer[b][y], lineSize);
 	}
 
-	void flush(int b, int y)
-	{
+	void flush(int b, int y) {
 		if(!psram) return;
 			Cache_WriteBack_Addr((uint32_t)buffer[b][y], lineSize);
 	}
@@ -148,17 +138,15 @@ class DMAVideoBuffer
 		Cache_WriteBack_Addr((uint32_t)start, length);
 	}*/
 
-	int getBufferCount() const
-	{
+	int getBufferCount() const {
 		return bufferCount;
 	}
 
-	bool isValid() const
-	{
+	bool isValid() const {
 		return valid;
 	}
-	void clearFast(uint8_t value, int b = 0)
-	{
+
+	void clearFast(uint8_t value, int b = 0) {
 		for (int y = 0; y < lines; y++)
 		{
 			memset(buffer[b][y], value, lineSize);

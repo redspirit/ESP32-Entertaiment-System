@@ -111,7 +111,7 @@ void update60fps(float dt) {
 
     luaManager::callUpdate(dt);
     luaManager::callShow();
-    vga.clearFast(0); // раньше это было в lua но пока тут оставим
+    vga.clear(0); // раньше это было в lua но пока тут оставим
 
     GUI::render(vga);
     GUIText::renderCursor(vga);

@@ -32,7 +32,7 @@ namespace luaManager {
 
     static int l_clearFast(lua_State* Ls) {
         int c = luaL_checkinteger(Ls, 1);
-        g_vga->clearFast(c);
+        g_vga->clear(c);
         return 0;
     }
 

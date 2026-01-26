@@ -2,7 +2,6 @@
 #include <stdint.h>
 
 namespace shell {
-
     void init();
     void update(float dt);   // каждый кадр
     void onChar(char c);     // символы

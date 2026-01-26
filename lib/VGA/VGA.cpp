@@ -8,13 +8,6 @@
 #include <math.h>
 #include <esp_private/gdma.h>
 
-#ifndef min
-#define min(a,b)((a)<(b)?(a):(b))
-#endif
-#ifndef max
-#define max(a,b)((a)>(b)?(a):(b))
-#endif
-
 //borrowed from esp code
 #define HAL_FORCE_MODIFY_U32_REG_FIELD(base_reg, reg_field, field_val)    \
 {                                                           \
@@ -25,31 +18,27 @@
 	(base_reg).val = temp_reg.val;                          \
 }
 
-VGA::VGA()
-{
+VGA::VGA() {
 	bufferCount = 1;
 	dmaBuffer = 0;
 	usePsram = true;
 	dmaChannel = 0;
 }
 
-VGA::~VGA()
-{
+VGA::~VGA() {
 	bits = 0;
 	backBuffer = 0;
 }
 
 extern int Cache_WriteBack_Addr(uint32_t addr, uint32_t size);
 
-void VGA::attachPinToSignal(int pin, int signal)
-{
+void VGA::attachPinToSignal(int pin, int signal) {
 	esp_rom_gpio_connect_out_signal(pin, signal, false, false);
 	gpio_hal_iomux_func_sel(GPIO_PIN_MUX_REG[pin], PIN_FUNC_GPIO);
 	gpio_set_drive_capability((gpio_num_t)pin, (gpio_drive_cap_t)3);
 }
 
-bool VGA::init(const PinConfig cfgPins, const Mode mode)
-{
+bool VGA::init(const PinConfig cfgPins, const Mode mode) {
 	int bits = 8;
 	this->pins = cfgPins;
 	this->mode = mode;
@@ -152,8 +141,7 @@ bool VGA::init(const PinConfig cfgPins, const Mode mode)
 	return true;
 }
 
-bool VGA::start()
-{
+bool VGA::start() {
 	//TODO check start
 	//very delicate... dma might be late for peripheral
 	gdma_reset((gdma_channel_handle_t)dmaChannel);
@@ -171,8 +159,7 @@ bool VGA::start()
 	return true;
 }
 
-bool VGA::show()
-{
+bool VGA::show() {
 	//TODO check start
 	dmaBuffer->flush(backBuffer);
 	if(bufferCount <= 1) 
@@ -183,46 +170,21 @@ bool VGA::show()
 	return true;
 }
 
-void VGA::dot(int x, int y, uint8_t r, uint8_t g, uint8_t b)
-{
+void VGA::dot(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
 	if(x >= mode.hRes || y >= mode.vRes) return;
 	dmaBuffer->getLineAddr8(y, backBuffer)[x] = (r >> 5) | ((g >> 5) << 3) | (b & 0b11000000);
 }
 
-void VGA::dot(int x, int y, int rgb)
-{
+void VGA::dot(int x, int y, int rgb) {
 	if(x >= mode.hRes || y >= mode.vRes) return;
 	dmaBuffer->getLineAddr8(y, backBuffer)[x] = rgb;
 }
 
-void VGA::dotdit(int x, int y, uint8_t r, uint8_t g, uint8_t b)
-{
-	if(x >= mode.hRes || y >= mode.vRes) return;
-	r = min((rand() & 31) | (r & 0xe0), 255);
-	g = min((rand() & 31) | (g & 0xe0), 255);
-	b = min((rand() & 63) | (b & 0xc0), 255);
-	dmaBuffer->getLineAddr8(y, backBuffer)[x] = (r >> 5) | ((g >> 5) << 3) | (b & 0b11000000);
+void VGA::clear(uint8_t color) {
+	dmaBuffer->clearFast(color, backBuffer);
 }
 
-int VGA::rgb(uint8_t r, uint8_t g, uint8_t b)
-{
-	return (r >> 5) | ((g >> 5) << 3) | (b & 0b11000000);
-}
-
-void VGA::clear(int rgb)
-{
-	for(int y = 0; y < mode.vRes; y++)
-		for(int x = 0; x < mode.hRes; x++)
-			dot(x, y, rgb);
-}
-
-void VGA::clearFast(uint8_t color)
-{
-    dmaBuffer->clearFast(color, backBuffer);
-}
-
-void VGA::fillRect(int x, int y, int w, int h, int rgb)
-{
+void VGA::fillRect(int x, int y, int w, int h, int rgb) {
     int x2 = x + w;
     int y2 = y + h;
 
