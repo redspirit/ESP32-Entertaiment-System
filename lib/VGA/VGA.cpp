@@ -19,7 +19,7 @@
 }
 
 VGA::VGA() {
-	bufferCount = 1;
+	bufferCount = 2;
 	dmaBuffer = 0;
 	usePsram = true;
 	dmaChannel = 0;
@@ -197,4 +197,11 @@ void VGA::fillRect(int x, int y, int w, int h, int rgb) {
     for (int yy = y; yy < y2; yy++)
         for (int xx = x; xx < x2; xx++)
             dot(xx, yy, rgb);
+}
+
+uint8_t* VGA::getLinePtr8Safe(int y) {
+    if (y < 0 || y >= mode.vRes)
+        return nullptr;
+
+    return dmaBuffer->getLineAddr8(y, backBuffer);
 }

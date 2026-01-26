@@ -4,18 +4,7 @@
 #include "Mode.h"
 #include "DMAVideoBuffer.h"
 
-class VGA
-{
-	public:
-	Mode mode;
-	int bufferCount;
-	int bits;
-	PinConfig pins;
-	int backBuffer;
-	DMAVideoBuffer *dmaBuffer;
-	bool usePsram;
-	int dmaChannel;
-	
+class VGA {
 	public:
 		VGA();
 		~VGA();
@@ -26,6 +15,21 @@ class VGA
 		void fillRect(int x, int y, int w, int h, int rgb);
 		void dot(int x, int y, uint8_t r, uint8_t g, uint8_t b);
 		void dot(int x, int y, int rgb);
+    	inline uint8_t* getLinePtr8(int y) {
+			// указатель на начало строки (8 бит на пиксель)
+			return dmaBuffer->getLineAddr8(y, backBuffer);
+		} 
+    	uint8_t* getLinePtr8Safe(int y);	// с проверкой диапазона y
+
+	private:
+		Mode mode;
+		int bufferCount;
+		int bits;
+		PinConfig pins;
+		int backBuffer;
+		DMAVideoBuffer *dmaBuffer;
+		bool usePsram;
+		int dmaChannel;
 
 	protected:
 		void attachPinToSignal(int pin, int signal);

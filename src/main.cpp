@@ -25,7 +25,6 @@ Mode mode = Mode::MODE_320x240x60;
 
 void setup() {
 	LOG.begin(115200);
-	vga.bufferCount = 2;
 	if(!vga.init(pins, mode)) while(1) delay(1);
 	vga.start();
 

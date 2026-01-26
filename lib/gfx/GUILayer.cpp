@@ -29,7 +29,7 @@ namespace GUI {
 
         for (int y = 0; y < 8; y++) {
             uint8_t row = glyph[y];
-            uint8_t* dst = vga.dmaBuffer->getLineAddr8(sy + y, vga.backBuffer) + sx;
+            uint8_t* dst = vga.getLinePtr8(sy + y) + sx;
 
             if (transparentBg) {
                 for (int x = 0; x < 8; x++) {
