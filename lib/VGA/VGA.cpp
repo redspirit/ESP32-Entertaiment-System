@@ -170,11 +170,6 @@ bool VGA::show() {
 	return true;
 }
 
-void VGA::dot(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-	if(x >= mode.hRes || y >= mode.vRes) return;
-	dmaBuffer->getLineAddr8(y, backBuffer)[x] = (r >> 5) | ((g >> 5) << 3) | (b & 0b11000000);
-}
-
 void VGA::dot(int x, int y, int rgb) {
 	if(x >= mode.hRes || y >= mode.vRes) return;
 	dmaBuffer->getLineAddr8(y, backBuffer)[x] = rgb;
