@@ -180,10 +180,13 @@ void Console::getCursor(int& x, int& y) const {
 }
 
 void Console::cursorUpdate(float dt) {
+    if (!cursorEnabled_)
+        return;
+
     blinkTimer_ += dt;
     if (blinkTimer_ >= blinkSpeed_) {
         blinkTimer_ = 0.0f;
-        cursorVisible_ = !cursorVisible_;
+        cursorPhase_ = !cursorPhase_;
     }
 }
 
@@ -204,7 +207,7 @@ void Console::show(int y1, int y2) {
         }
     }
 
-    if (cursorVisible_) {
+    if (cursorEnabled_ && cursorPhase_) {
         tiles_->drawTileForeground(
             cx_, cy_,
             { (uint8_t)cursorChar_, currentColor_ }
@@ -223,5 +226,7 @@ void Console::cursorSetup(char cursorChar, float cursorBlinkSpeed) {
 }
 
 void Console::setCursorVisible(bool visible) {
-    cursorVisible_ = visible;
+    cursorEnabled_ = visible;
+    cursorPhase_   = true;     // сразу зажигаем при включении
+    blinkTimer_    = 0.0f;
 }

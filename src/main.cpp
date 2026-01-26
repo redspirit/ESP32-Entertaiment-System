@@ -39,6 +39,16 @@ void setup() {
     console.useDefaultColor();
     console.printLn("Pipp     kaka");
 
+    console.setCursorVisible(true);
+
+    //console.show();
+    //vga.show();
+
+}
+
+void update60fps(float dt) {
+    vga.clear(0);
+    console.cursorUpdate(dt);
     console.show();
     vga.show();
 
@@ -47,12 +57,6 @@ void setup() {
 unsigned long fps_last_time = 0;
 unsigned long fps_frames = 0;
 unsigned long fps_frames_final = 0;
-
-void update60fps(float dt) {
-
-
-
-}
 
 void loop() {
     static unsigned long last = 0;

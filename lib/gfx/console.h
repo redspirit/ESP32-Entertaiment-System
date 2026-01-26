@@ -70,7 +70,8 @@ class Console {
         char cursorChar_ = '_';
         float blinkSpeed_ = 0.5f;
         float blinkTimer_ = 0.0f;
-        bool cursorVisible_ = false;
+        bool cursorEnabled_ = false;   // управляется setCursorVisible()
+        bool cursorPhase_   = true;    // мигание
 
     private:
         inline CharTile& cell(int x, int y);
