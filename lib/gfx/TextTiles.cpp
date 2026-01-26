@@ -14,8 +14,6 @@ TextTiles::~TextTiles() {
 
 void TextTiles::init(
     VGA& vga,
-    int screenW,
-    int screenH,
     int tileW,
     int tileH
 ) {
@@ -24,8 +22,8 @@ void TextTiles::init(
     tileW_ = tileW;
     tileH_ = tileH;
 
-    gridW_ = screenW / tileW_; // округляется вниз до целого автоматически
-    gridH_ = screenH / tileH_;
+    gridW_ = vga.width() / tileW_; // округляется вниз до целого автоматически
+    gridH_ = vga.height() / tileH_;
 
     // переаллоцируем, если нужно
     size_t count = gridW_ * gridH_;

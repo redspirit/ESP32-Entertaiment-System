@@ -1,5 +1,5 @@
 #include "VGA.h"
-#include "TextTiles.h"
+#include "console.h"
 #include "palette.h"
 #include "LOG.h"
 #include <Arduino.h>
@@ -15,7 +15,7 @@ VGA vga;
 Mode mode = Mode::MODE_320x240x60;
 //Mode mode = Mode::MODE_640x480x60;
 
-TextTiles text;
+Console console;
 
 void setup() {
 	LOG.begin(115200);
@@ -30,23 +30,16 @@ void setup() {
 
 
     paletteInit();
-    text.init(
-        vga,
-        320, 240,   // экран
-        8, 8        // размер тайла
-    );    
 
-    vga.clear(0);
-    text.print("This is my PC", 1, 1, COLOR_RED);
+    console.init(vga, 8, 8, COLOR_WHITE);
+    console.printLn("Hello ZX-style console!");
+    console.printLn("Red spirit");
+    console.setColor(COLOR_CYAN);
+    console.printLn("Colored line");
+    console.useDefaultColor();
+    console.printLn("Pipp     kaka");
 
-    text.foregroundVisible(true);
-    TextTiles::CharTile tl;
-    tl.ch = '_';
-    tl.color = COLOR_BLUE;
-
-    text.drawTileForeground(1, 3, tl);
-
-    text.render();
+    console.show();
     vga.show();
 
 }

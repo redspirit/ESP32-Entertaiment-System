@@ -1,173 +1,227 @@
-#include <console.h>
+#include "console.h"
+#include "TextTiles.h"
+#include "VGA.h"
+#include <stdlib.h>
 #include <string.h>
-#include <GUILayer.h>
-#include <GUIText.h>
-#include <palette.h>
 
-namespace console {
+Console::Console() {}
 
-    static uint8_t current_color = COLOR_GREEN;
-    static uint8_t default_color = COLOR_WHITE;
-
-    // кольцевой буфер символов
-    static GUI::Tile buffer[GUI::GRID_H][GUI::GRID_W];
-
-    static int head  = 0;   // первая видимая строка
-    static int count = 0;   // количество строк в буфере
-
-    // курсор
-    static int cx = 0;
-    static int cy = 0;
-
-    void setCursor(int x, int y) {
-        if (x < 0) x = 0;
-        if (x >= GUI::GRID_W) x = GUI::GRID_W - 1;
-
-        if (y < 0) y = 0;
-        if (y >= GUI::GRID_H) y = GUI::GRID_H - 1;
-
-        cx = x;
-        cy = y;
+Console::~Console() {
+    if (buffer_) {
+        free(buffer_);
+        buffer_ = nullptr;
     }
-
-    void getCursor(int& x, int& y) {
-        x = cx;
-        y = cy;
+    if (tiles_) {
+        delete tiles_;
+        tiles_ = nullptr;
     }
+}
 
-    static void clearLine(int row) {
-        for (int x = 0; x < GUI::GRID_W; x++) {
-            buffer[row][x].ch    = ' ';
-            //buffer[row][x].color = default_color;
-        }
+void Console::init(
+    VGA& vga,
+    int tileW,
+    int tileH,
+    uint8_t defaultColor
+) {
+    vga_ = &vga;
+
+    // создаём и инициализируем TextTiles
+    tiles_ = new TextTiles();
+    tiles_->init(vga, tileW, tileH);
+
+    width_  = tiles_->width();
+    height_ = tiles_->height();
+
+    buffer_ = (CharTile*)
+        malloc(width_ * height_ * sizeof(CharTile));
+    memset(buffer_, 0, width_ * height_ * sizeof(CharTile));
+
+    defaultColor_ = defaultColor;
+    currentColor_ = defaultColor;
+
+    clear();
+}
+
+TextTiles& Console::tiles() {
+    return *tiles_;
+}
+
+void Console::clear() {
+    for (int i = 0; i < height_; i++)
+        clearLine(i);
+
+    head_ = 0;
+    count_ = 0;
+    cx_ = cy_ = 0;
+}
+
+void Console::setColor(uint8_t color) {
+    currentColor_ = color;
+}
+
+void Console::useDefaultColor() {
+    currentColor_ = defaultColor_;
+}
+
+inline CharTile& Console::cell(int x, int y) {
+    return buffer_[y * width_ + x];
+}
+
+void Console::clearLine(int row) {
+    for (int x = 0; x < width_; x++) {
+        auto& t = cell(x, row);
+        t.ch = ' ';
+        t.color = defaultColor_;
     }
+}
 
-    void clear() {
-        for (int i = 0; i < GUI::GRID_H; i++)
-            clearLine(i);
+void Console::scrollUp() {
+    head_ = (head_ + 1) % height_;
+    if (cy_ > 0) cy_--;
+}
 
-        head = 0;
-        count = 0;
-        cx = 0;
-        cy = 0;
+void Console::newLine() {
+    cx_ = 0;
+
+    if (count_ < height_) {
+        cy_ = count_;
+        clearLine((head_ + count_) % height_);
+        count_++;
+    } else {
+        scrollUp();
+        cy_ = height_ - 1;
+        clearLine((head_ + cy_) % height_);
     }
+}
 
-    void setColor(uint8_t color) {
-        current_color = color;
-    }
-
-    void useDefaultColor() {
-        current_color = default_color;
-    }
-
-    static void scrollUp() {
-        head = (head + 1) % GUI::GRID_H;
-        count--;
-        if (cy > 0) cy--;
-    }
-
-    static void newLine() {
-        cx = 0;
-
-        if (count < GUI::GRID_H) {
-            cy = count;
-            clearLine((head + count) % GUI::GRID_H);
-            count++;
-        } else {
-            scrollUp();
-            cy = count;
-            clearLine((head + count) % GUI::GRID_H);
-            count++;
-        }
-    }
-
-
-    void flush() {
-        GUI::Tile* map = GUI::getTilemap();
-
-        for (int y = 0; y < GUI::GRID_H; y++) {
-            int src = (head + y) % GUI::GRID_H;
-            memcpy(&map[y * GUI::GRID_W],
-                buffer[src],
-                sizeof(GUI::Tile) * GUI::GRID_W);
-        }
-    }
-
-    void printRawChar(char c, uint16_t repeat) {
-        while (repeat--) {
-            if (cx >= GUI::GRID_W)
-                newLine();
-
-            int row = (head + cy) % GUI::GRID_H;
-
-            buffer[row][cx].ch    = c;
-            buffer[row][cx].color = current_color;
-
-            cx++;
-        }
-        flush();
-    }
-
-    void print(const char* text) {
-        if (count == 0)
+void Console::printRawChar(char c, uint16_t repeat) {
+    while (repeat--) {
+        if (cx_ >= width_)
             newLine();
 
-        for (const char* p = text; *p; ++p) {
+        int row = (head_ + cy_) % height_;
+        auto& t = cell(cx_, row);
+        t.ch = c;
+        t.color = currentColor_;
+        cx_++;
+    }
+}
 
-            if (*p == '\n') {
-                newLine();
-                continue;
-            }
+void Console::print(const char* text) {
+    if (count_ == 0)
+        newLine();
 
-            if (cx >= GUI::GRID_W)
-                newLine();
-
-            int row = (head + cy) % GUI::GRID_H;
-
-            buffer[row][cx].ch    = *p;
-            buffer[row][cx].color = current_color;
-            cx++;
+    for (; *text; ++text) {
+        if (*text == '\n') {
+            newLine();
+            continue;
         }
 
-        flush();
+        if (cx_ >= width_)
+            newLine();
+
+        int row = (head_ + cy_) % height_;
+        auto& t = cell(cx_, row);
+        t.ch = *text;
+        t.color = currentColor_;
+        cx_++;
+    }
+}
+
+void Console::print(char c) {
+    char buf[2] = { c, 0 };
+    print(buf);
+}
+
+void Console::print(int value) {
+    char buf[12];
+    itoa(value, buf, 10);
+    print(buf);
+}
+
+void Console::printLn() {
+    newLine();
+}
+
+void Console::printLn(const char* text) {
+    if (text)
+        print(text);
+    newLine();
+}
+
+void Console::printLn(int value) {
+    print(value);
+    newLine();
+}
+
+void Console::clearCharAt(int x, int y) {
+    if (x < 0 || x >= width_) return;
+    if (y < 0 || y >= height_) return;
+
+    int row = (head_ + y) % height_;
+    auto& t = cell(x, row);
+    t.ch = ' ';
+    t.color = defaultColor_;
+}
+
+void Console::setCursor(int x, int y) {
+    if (x < 0) x = 0;
+    if (x >= width_) x = width_ - 1;
+    if (y < 0) y = 0;
+    if (y >= height_) y = height_ - 1;
+
+    cx_ = x;
+    cy_ = y;
+}
+
+void Console::getCursor(int& x, int& y) const {
+    x = cx_;
+    y = cy_;
+}
+
+void Console::cursorUpdate(float dt) {
+    blinkTimer_ += dt;
+    if (blinkTimer_ >= blinkSpeed_) {
+        blinkTimer_ = 0.0f;
+        cursorVisible_ = !cursorVisible_;
+    }
+}
+
+void Console::show() {
+    show(0, height_ - 1);
+}
+
+void Console::show(int y1, int y2) {
+    if (!tiles_) return;
+
+    if (y1 < 0) y1 = 0;
+    if (y2 >= height_) y2 = height_ - 1;
+
+    for (int y = y1; y <= y2; y++) {
+        int src = (head_ + y) % height_;
+        for (int x = 0; x < width_; x++) {
+            tiles_->drawTile(x, y, cell(x, src));
+        }
     }
 
-    void print(char c) {
-        char buf[2] = { c, 0 };
-        print(buf);
+    if (cursorVisible_) {
+        tiles_->drawTileForeground(
+            cx_, cy_,
+            { (uint8_t)cursorChar_, currentColor_ }
+        );
+        tiles_->foregroundVisible(true);
+    } else {
+        tiles_->foregroundVisible(false);
     }
 
-    void print(int value) {
-        char buf[12]; // достаточно для int32
-        itoa(value, buf, 10);
-        print(buf);
-    }    
-    
-    void printLn(int value) {
-        print(value);
-        printLn();
-    }
+    tiles_->render();
+}
 
-    void printLn(const char* text) {
-        if (text)
-            print(text);
+void Console::cursorSetup(char cursorChar, float cursorBlinkSpeed) {
+    cursorChar_ = cursorChar;
+    blinkSpeed_ = cursorBlinkSpeed;
+}
 
-        newLine();
-        flush();
-    }
-
-    void printLn() {
-        newLine();
-        flush();
-    }
-
-    void clearCharAt(int x, int y) {
-        if (x < 0 || x >= GUI::GRID_W) return;
-        if (y < 0 || y >= GUI::GRID_H) return;
-
-        int row = (head + y) % GUI::GRID_H;
-        buffer[row][x].ch = ' ';
-        flush();
-    }
-
+void Console::setCursorVisible(bool visible) {
+    cursorVisible_ = visible;
 }

@@ -1,22 +1,18 @@
 #pragma once
 #include <stdint.h>
+#include "CharTile.h"
 
 class VGA;
 
 class TextTiles {
 public:
-    struct CharTile {
-        uint8_t ch;
-        uint8_t color;
-    };
+    using Tile = CharTile;
 
     TextTiles() = default;
     ~TextTiles();
 
     void init(
         VGA& vga,
-        int screenW,
-        int screenH,
         int tileW = 8,
         int tileH = 8
     );

@@ -11,6 +11,8 @@ class VGA {
 		bool init(const PinConfig cfgPins, const Mode mode);
 		bool start();
 		bool show();
+		inline int width() const  { return mode.hRes; }
+		inline int height() const { return mode.vRes; }		
 		void clear(uint8_t color);
 		void fillRect(int x, int y, int w, int h, int rgb);
 		void dot(int x, int y, int rgb);
