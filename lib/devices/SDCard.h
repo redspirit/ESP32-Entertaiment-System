@@ -3,7 +3,15 @@
 #include <stdint.h>
 #include <cstddef>
 
-namespace SDCard {
+namespace fs {
+    class File;
+}
+
+class SDCard {
+public:
+    SDCard();
+    ~SDCard();
+
     bool init();
 
     bool open(const char* path);
@@ -23,10 +31,8 @@ namespace SDCard {
     size_t fileSize(const char* path);
 
     bool writeTextFile(const char* path, const char* text);
-    bool appendTextFile(const char* path, const char* text);    
+    bool appendTextFile(const char* path, const char* text);
 
-    // читает файл, если размер <= maxLen
-    // возвращает false если файл не существует или слишком большой
     bool readTextFileLimited(
         const char* path,
         char* dst,
@@ -34,4 +40,17 @@ namespace SDCard {
         size_t* outSize = nullptr
     );
 
-}
+private:
+    bool inited_ = false;
+
+    struct DirEntry {
+        static constexpr int MAX_NAME_LEN = 32;
+        char name[MAX_NAME_LEN];
+        bool isDir;
+    };
+
+    static constexpr int MAX_DIR_ENTRIES = 64;
+
+private:
+    fs::File* currentFile_ = nullptr;
+};

@@ -1,6 +1,7 @@
 #include "VGA.h"
 #include "console.h"
 #include "palette.h"
+#include "keyboard.h"
 #include "LOG.h"
 #include <Arduino.h>
 
@@ -16,6 +17,7 @@ Mode mode = Mode::MODE_320x240x60;
 //Mode mode = Mode::MODE_640x480x60;
 
 Console console;
+Keyboard kb;
 
 void setup() {
 	LOG.begin(115200);
@@ -44,11 +46,21 @@ void setup() {
     //console.show();
     //vga.show();
 
+    kb.init();
+
 }
 
 void update60fps(float dt) {
     vga.clear(0);
     console.cursorUpdate(dt);
+
+    kb.beginFrame();
+    
+    char c;
+    if (kb.getChar(c)) {
+        console.print(c);
+    }
+
     console.show();
     vga.show();
 
@@ -59,6 +71,7 @@ unsigned long fps_frames = 0;
 unsigned long fps_frames_final = 0;
 
 void loop() {
+    kb.poll();
     static unsigned long last = 0;
     unsigned long now = millis();
     if (now - last < 16) return; // ~60 FPS
